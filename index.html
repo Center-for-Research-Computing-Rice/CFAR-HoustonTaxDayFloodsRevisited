@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Houston Flood Visualization</title>
+    
+    <!-- Leaflet CSS and JavaScript -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="map-container">
+        <div id="viewDiv"></div>
+        <div id="info-panel">
+            <h1>Houston Flood Information</h1>
+            <p>Visualizing flood data for Houston, Texas</p>
+        </div>
+        <div id="basemap-selector">
+            <label for="basemap-dropdown">Basemap:</label>
+            <select id="basemap-dropdown">
+                <option value="osm">OpenStreetMap</option>
+                <option value="cartodb-positron">CartoDB Positron</option>
+                <option value="cartodb-voyager">CartoDB Voyager</option>
+                <option value="esri-aerial">Satellite</option>
+                <option value="usgs-topo">USGS Topographic</option>
+            </select>
+        </div>
+        <div id="current-basemap">
+            <span id="basemap-name">OpenStreetMap</span>
+        </div>
+    </div>
+
+    <!-- Local JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

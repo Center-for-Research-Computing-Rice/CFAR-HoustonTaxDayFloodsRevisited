@@ -1,0 +1,134 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body, #viewDiv {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#map-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+}
+
+#viewDiv {
+    border-radius: 0;
+    position: relative;
+    z-index: 0;
+}
+
+/* Leaflet specific adjustments */
+.leaflet-container {
+    background-color: #f0f0f0;
+}
+
+.leaflet-control-attribution {
+    font-size: 11px;
+}
+
+.leaflet-bottom.leaflet-right {
+    z-index: 999;
+}
+
+.leaflet-control-zoom {
+    z-index: 999 !important;
+}
+
+#info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    max-width: 300px;
+    font-size: 14px;
+}
+
+#info-panel h1 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+#info-panel p {
+    color: #666;
+    line-height: 1.5;
+}
+
+#basemap-selector {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#basemap-selector label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+#basemap-dropdown {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+#basemap-dropdown:hover {
+    border-color: #999;
+}
+
+#basemap-dropdown:focus {
+    outline: none;
+    border-color: #0079c1;
+    box-shadow: 0 0 0 3px rgba(0, 121, 193, 0.1);
+}
+
+#current-basemap {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 100;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+#basemap-name {
+    display: inline-block;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    #info-panel {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}

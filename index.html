@@ -19,18 +19,76 @@
             <h1>Houston Flood Information</h1>
             <p>Visualizing flood data for Houston, Texas</p>
         </div>
-        <div id="basemap-selector">
-            <label for="basemap-dropdown">Basemap:</label>
-            <select id="basemap-dropdown">
-                <option value="osm">OpenStreetMap</option>
-                <option value="cartodb-positron">CartoDB Positron</option>
-                <option value="cartodb-voyager">CartoDB Voyager</option>
-                <option value="esri-aerial">Satellite</option>
-                <option value="usgs-topo">USGS Topographic</option>
-            </select>
+        <div id="search-panel">
+            <input type="text" id="address-search" placeholder="Search address..." />
+            <button id="search-btn">Search</button>
         </div>
-        <div id="current-basemap">
-            <span id="basemap-name">OpenStreetMap</span>
+        <div id="controls-panel">
+            <button id="controls-toggle" class="toggle-btn">⚙ Settings ▼</button>
+            <div id="controls-content">
+                <div id="basemap-selector">
+                    <label for="basemap-dropdown">Basemap:</label>
+                    <select id="basemap-dropdown">
+                        <option value="cartodb-positron">CartoDB Positron</option>
+                        <option value="osm">OpenStreetMap</option>
+                        <option value="cartodb-voyager">CartoDB Voyager</option>
+                        <option value="esri-aerial">Satellite</option>
+                        <option value="usgs-topo">USGS Topographic</option>
+                    </select>
+                </div>
+                <div id="raster-toggle">
+                    <label for="raster-selector">Raster Layer:</label>
+                    <select id="raster-selector">
+                        <option value="historic">Historic Flood Data</option>
+                        <option value="transposed">Transposed Flood Data</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="flood-legend">
+            <h3>Flood Intensity</h3>
+            <div class="legend-item" data-color="0">
+                <span class="legend-color" style="background-color: #ffffff;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">No Flood</span>
+                    <span class="legend-depth">0 ft</span>
+                </div>
+            </div>
+            <div class="legend-item" data-color="1">
+                <span class="legend-color" style="background-color: #ccffff;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">Light</span>
+                    <span class="legend-depth">0-2 ft</span>
+                </div>
+            </div>
+            <div class="legend-item" data-color="2">
+                <span class="legend-color" style="background-color: #66d9ff;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">Moderate</span>
+                    <span class="legend-depth">2-4 ft</span>
+                </div>
+            </div>
+            <div class="legend-item" data-color="3">
+                <span class="legend-color" style="background-color: #0099ff;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">Heavy</span>
+                    <span class="legend-depth">4-6 ft</span>
+                </div>
+            </div>
+            <div class="legend-item" data-color="4">
+                <span class="legend-color" style="background-color: #0047b2;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">Severe</span>
+                    <span class="legend-depth">6-8 ft</span>
+                </div>
+            </div>
+            <div class="legend-item" data-color="5">
+                <span class="legend-color" style="background-color: #F523F5;"></span>
+                <div class="legend-text">
+                    <span class="legend-label">Extreme</span>
+                    <span class="legend-depth">8-10+ ft</span>
+                </div>
+            </div>
         </div>
     </div>
 

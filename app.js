@@ -86,14 +86,35 @@ function createCentroidRenderer(fieldName) {
         type: "class-breaks",
         field: fieldName,
         classBreakInfos: [
-            { minValue: Number.NEGATIVE_INFINITY, maxValue: 0, symbol: { type: "simple-marker", size: 4, color: "#ffffff", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "No Flood" },
-            { minValue: 0.00001, maxValue: 2, symbol: { type: "simple-marker", size: 4, color: "#ccffff", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "Light (0-2 ft)" },
-            { minValue: 2.00001, maxValue: 4, symbol: { type: "simple-marker", size: 4, color: "#66d9ff", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "Moderate (2-4 ft)" },
-            { minValue: 4.00001, maxValue: 6, symbol: { type: "simple-marker", size: 4, color: "#0099ff", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "Heavy (4-6 ft)" },
-            { minValue: 6.00001, maxValue: 8, symbol: { type: "simple-marker", size: 4, color: "#0047b2", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "Severe (6-8 ft)" },
-            { minValue: 8.00001, maxValue: Number.POSITIVE_INFINITY, symbol: { type: "simple-marker", size: 4, color: "#F523F5", outline: { color: "#dfdcdcbe", width: 0.5 } }, label: "Extreme (8-10+ ft)" }
+            {
+                minValue: Number.NEGATIVE_INFINITY,
+                maxValue: 0,
+                symbol: {
+                    type: "simple-marker",
+                    size: 4,
+                    color: "#ffffff",
+                    outline: { color: "#dfdcdcbe", width: 0.5 }
+                },
+                label: "No flood"
+            },
+            {
+                minValue: Number.MIN_VALUE,
+                maxValue: Number.POSITIVE_INFINITY,
+                symbol: {
+                    type: "simple-marker",
+                    size: 4,
+                    color: "#ff8c00",
+                    outline: { color: "#dfdcdcbe", width: 0.5 }
+                },
+                label: "Flooded"
+            }
         ],
-        defaultSymbol: { type: "simple-marker", size: 4, color: "#cccccc", outline: { color: "#dfdcdcbe", width: 0.5 } }
+        defaultSymbol: {
+            type: "simple-marker",
+            size: 4,
+            color: "#ffffff",
+            outline: { color: "#dfdcdcbe", width: 0.5 }
+        }
     };
 }
 

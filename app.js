@@ -6,6 +6,17 @@ const map = L.map('viewDiv', {
     zoomControl: false // Disable default zoom control
 }).setView(homePosition, homeZoom);
 
+// Color scale function for flood depth mapping
+function getFloodColor(depth) {
+    if (depth === null || depth === undefined) return '#cccccc'; // Gray for null values
+    if (depth <= 0) return '#ffffff'; // No flood
+    if (depth <= 2) return '#ccffff'; // Light flood
+    if (depth <= 4) return '#66d9ff'; // Moderate flood
+    if (depth <= 6) return '#0099ff'; // Heavy flood
+    if (depth <= 8) return '#0047b2'; // Severe flood
+    return '#F523F5'; // Extreme flood
+}
+
 // Create custom home button control
 L.Control.HomeButton = L.Control.extend({
     options: {
@@ -85,17 +96,22 @@ const overlayLayers = {
     centroids: L.esri.featureLayer({
         url: 'https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0',
         pointToLayer: function(feature, latlng) {
+            const depthValue = feature.properties[currentCentroidField];
+            const color = getFloodColor(depthValue);
+            
             return L.circleMarker(latlng, {
-                radius: 4,
-                fillColor: '#FF6B6B',
-                color: '#FF6B6B',
+                radius: 2,
+                fillColor: color,
+                color: '#dfdcdcbe',
                 weight: 1,
-                opacity: 0.8,
+                opacity: 0.9,
                 fillOpacity: 0.8
             });
         },
         onEachFeature: function(feature, layer) {
-            layer.bindPopup(`ID: ${feature.id}`);
+            const histValue = feature.properties.TD_histori || 'N/A';
+            const transValue = feature.properties.TD_transpo || 'N/A';
+            layer.bindPopup(`<b>Historic Flood Depth:</b> ${histValue} ft<br><b>Transposed Flood Depth:</b> ${transValue} ft`);
         }
     })
 };
@@ -103,6 +119,96 @@ const overlayLayers = {
 // Add default flood data layer to the map
 overlayLayers.historic.addTo(map);
 let currentFloodLayer = 'historic';
+let currentCentroidField = 'TD_histori'; // Track which field to display for centroids
+
+// Fetch and display statistics immediately on page load
+function fetchAndDisplayStatistics() {
+    console.log('Fetching feature data from ArcGIS...');
+    
+    const query = {
+        where: '1=1',
+        outFields: '*',
+        returnGeometry: false,
+        f: 'json'
+    };
+    
+    const queryString = new URLSearchParams(query).toString();
+    const url = `https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0/query?${queryString}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Features fetched:', data.features.length);
+            updateStatisticsDisplay(data.features, currentCentroidField);
+        })
+        .catch(error => {
+            console.error('Error fetching features:', error);
+        });
+}
+
+function updateStatisticsDisplay(features, field) {
+    const stats = {
+        'No Flood': 0,
+        'Light (0-2 ft)': 0,
+        'Moderate (2-4 ft)': 0,
+        'Heavy (4-6 ft)': 0,
+        'Severe (6-8 ft)': 0,
+        'Extreme (8-10+ ft)': 0
+    };
+    
+    const colors = {
+        'No Flood': '#ffffff',
+        'Light (0-2 ft)': '#ccffff',
+        'Moderate (2-4 ft)': '#66d9ff',
+        'Heavy (4-6 ft)': '#0099ff',
+        'Severe (6-8 ft)': '#0047b2',
+        'Extreme (8-10+ ft)': '#F523F5'
+    };
+    
+    // Count features in each class
+    features.forEach(feature => {
+        if (feature.attributes) {
+            const depth = feature.attributes[field];
+            
+            if (depth === null || depth === undefined) {
+                return;
+            }
+            
+            if (depth <= 0) {
+                stats['No Flood']++;
+            } else if (depth <= 2) {
+                stats['Light (0-2 ft)']++;
+            } else if (depth <= 4) {
+                stats['Moderate (2-4 ft)']++;
+            } else if (depth <= 6) {
+                stats['Heavy (4-6 ft)']++;
+            } else if (depth <= 8) {
+                stats['Severe (6-8 ft)']++;
+            } else {
+                stats['Extreme (8-10+ ft)']++;
+            }
+        }
+    });
+    
+    console.log('Statistics updated:', stats);
+    
+    // Display statistics
+    const statsContent = document.getElementById('stats-content');
+    let html = '';
+    for (const [label, count] of Object.entries(stats)) {
+        html += `<div class="stat-line">
+            <div>
+                <span class="stat-color" style="background-color: ${colors[label]};"></span>
+                <span class="stat-label">${label}</span>
+            </div>
+            <span class="stat-count">${count}</span>
+        </div>`;
+    }
+    statsContent.innerHTML = html;
+}
+
+// Fetch statistics when page loads
+fetchAndDisplayStatistics();
 
 // Basemap switcher functionality
 const basemapDropdown = document.getElementById('basemap-dropdown');
@@ -133,13 +239,46 @@ rasterSelector.addEventListener('change', function(event) {
     const selectedRaster = event.target.value;
     
     // Remove current flood layer
-    if (map.hasLayer(overlayLayers[currentFloodLayer])) {
+    if (currentFloodLayer !== 'none' && map.hasLayer(overlayLayers[currentFloodLayer])) {
         map.removeLayer(overlayLayers[currentFloodLayer]);
     }
     
-    // Add new flood layer
-    overlayLayers[selectedRaster].addTo(map);
-    overlayLayers[selectedRaster].bringToFront();
+    // Add new flood layer if not "none"
+    if (selectedRaster !== 'none') {
+        overlayLayers[selectedRaster].addTo(map);
+        overlayLayers[selectedRaster].bringToFront();
+        
+        // Update centroid field to match the selected raster layer
+        if (selectedRaster === 'historic') {
+            currentCentroidField = 'TD_histori';
+        } else if (selectedRaster === 'transposed') {
+            currentCentroidField = 'TD_transpo';
+        }
+        
+        // Update statistics for new field
+        const query = {
+            where: '1=1',
+            outFields: '*',
+            returnGeometry: false,
+            f: 'json'
+        };
+        
+        const queryString = new URLSearchParams(query).toString();
+        const url = `https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0/query?${queryString}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                updateStatisticsDisplay(data.features, currentCentroidField);
+            })
+            .catch(error => console.error('Error fetching features:', error));
+        
+        // Refresh centroids layer if it's visible
+        if (map.hasLayer(overlayLayers.centroids)) {
+            map.removeLayer(overlayLayers.centroids);
+            overlayLayers.centroids.addTo(map);
+        }
+    }
     
     currentFloodLayer = selectedRaster;
     console.log('Raster layer changed to:', selectedRaster);
@@ -160,6 +299,46 @@ centroidsToggle.addEventListener('change', function(event) {
     }
 });
 
+// Centroid field selector functionality
+const centroidFieldDropdown = document.getElementById('centroid-field-dropdown');
+
+centroidFieldDropdown.addEventListener('change', function(event) {
+    currentCentroidField = event.target.value;
+    
+    // Update statistics for new field
+    const statsContent = document.getElementById('stats-content');
+    if (statsContent.innerHTML.includes('Load centroids')) {
+        // Stats haven't been loaded yet
+        return;
+    }
+    
+    // Fetch and update statistics with new field
+    const query = {
+        where: '1=1',
+        outFields: '*',
+        returnGeometry: false,
+        f: 'json'
+    };
+    
+    const queryString = new URLSearchParams(query).toString();
+    const url = `https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0/query?${queryString}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            updateStatisticsDisplay(data.features, currentCentroidField);
+        })
+        .catch(error => console.error('Error fetching features:', error));
+    
+    // Refresh centroids layer if it's visible
+    if (map.hasLayer(overlayLayers.centroids)) {
+        map.removeLayer(overlayLayers.centroids);
+        overlayLayers.centroids.addTo(map);
+    }
+    
+    console.log('Centroid field changed to:', currentCentroidField);
+});
+
 // Opacity/Transparency slider functionality
 const opacitySlider = document.getElementById('opacity-slider');
 const opacityValue = document.getElementById('opacity-value');
@@ -176,6 +355,15 @@ opacitySlider.addEventListener('input', function(event) {
     opacityValue.textContent = (100 - transparency) + '%';
     
     console.log('Raster layer opacity changed to:', opacity);
+});
+
+// Sidebar collapse/expand functionality
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebar = document.getElementById('sidebar');
+
+sidebarToggle.addEventListener('click', function() {
+    sidebar.classList.toggle('collapsed');
+    sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '›' : '‹';
 });
 
 // Controls panel toggle functionality

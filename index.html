@@ -18,9 +18,12 @@
 <body>
     <div id="map-container">
         <div id="sidebar">
+            <div id="sidebar-header">
+                <h1>Houston's Tax Day Floods Revisited</h1>
+                <button id="sidebar-toggle" class="sidebar-toggle-btn">‹</button>
+            </div>
             <div id="info-panel">
-                <h1>Houston Flood Information</h1>
-                <p>Visualizing flood data for Houston, Texas</p>
+                <p>Visualizing flood data for Clear Creek, Houston, Texas</p>
             </div>
             <div id="search-panel">
                 <input type="text" id="address-search" placeholder="Search address..." />
@@ -42,8 +45,10 @@
                     <div id="raster-toggle">
                         <label for="raster-selector">Raster Layer:</label>
                         <select id="raster-selector">
+                            
                             <option value="historic">Historic Flood Data</option>
                             <option value="transposed">Transposed Flood Data</option>
+                            <option value="none">None</option>
                         </select>
                     </div>
                     <div id="opacity-control">
@@ -58,6 +63,19 @@
                             <input type="checkbox" id="centroids-toggle" />
                             Show Centroids (Feature Layer)
                         </label>
+                    </div>
+                    <div id="centroid-field-selector">
+                        <label for="centroid-field-dropdown">Centroid Data Field:</label>
+                        <select id="centroid-field-dropdown">
+                            <option value="TD_histori">Historic Flood Data</option>
+                            <option value="TD_transpo">Transposed Flood Data</option>
+                        </select>
+                    </div>
+                    <div id="depth-statistics">
+                        <h4>Feature Count by Depth</h4>
+                        <div id="stats-content">
+                            <p style="color: #888; font-size: 12px;">Load centroids to view statistics</p>
+                        </div>
                     </div>
                 </div>
             </div>

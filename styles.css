@@ -25,10 +25,53 @@ html, body, #viewDiv {
     border-right: 1px solid #ddd;
     overflow-y: auto;
     z-index: 200;
-    padding: 20px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
+    transition: width 0.3s ease;
+}
+
+#sidebar.collapsed {
+    width: 60px;
+    padding: 10px 5px;
+}
+
+#sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+#sidebar-header h1 {
+    font-size: 16px;
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#sidebar.collapsed #sidebar-header h1,
+#sidebar.collapsed #info-panel,
+#sidebar.collapsed #search-panel,
+#sidebar.collapsed #controls-panel,
+#sidebar.collapsed #depth-statistics {
+    display: none;
+}
+
+.sidebar-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 5px;
+    color: #333;
+    transition: color 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+    color: #0099ff;
 }
 
 #viewDiv {
@@ -72,38 +115,33 @@ html, body, #viewDiv {
 
 #info-panel {
     background-color: #ffffff;
-    padding: 15px;
+    padding: 10px;
     border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    font-size: 14px;
-}
-
-#info-panel h1 {
-    font-size: 18px;
-    margin-bottom: 8px;
-    color: #333;
+    font-size: 12px;
 }
 
 #info-panel p {
     color: #666;
-    line-height: 1.5;
+    line-height: 1.4;
+    margin: 0;
 }
 
 #search-panel {
     background-color: #ffffff;
-    padding: 12px;
+    padding: 10px;
     border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 #address-search {
-    padding: 8px 12px;
+    padding: 7px 10px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 12px;
     width: 100%;
     transition: border-color 0.2s;
 }
@@ -115,12 +153,12 @@ html, body, #viewDiv {
 }
 
 #search-btn {
-    padding: 8px 16px;
+    padding: 7px 14px;
     background-color: #0099ff;
     color: #fff;
     border: none;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -139,15 +177,16 @@ html, body, #viewDiv {
     border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+    margin-top: 5px;
 }
 
 .toggle-btn {
     width: 100%;
-    padding: 12px 16px;
+    padding: 10px 12px;
     background-color: #f5f5f5;
     border: none;
     border-bottom: 1px solid #e0e0e0;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: #333;
     cursor: pointer;
@@ -161,8 +200,8 @@ html, body, #viewDiv {
 #controls-content {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    gap: 9px;
+    padding: 10px;
 }
 
 #controls-content.collapsed {
@@ -172,21 +211,21 @@ html, body, #viewDiv {
 #basemap-selector {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 #basemap-selector label {
     font-weight: 600;
     color: #333;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 #basemap-dropdown {
-    padding: 6px 10px;
+    padding: 5px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: #fff;
-    font-size: 14px;
+    font-size: 12px;
     cursor: pointer;
     transition: border-color 0.2s;
 }
@@ -204,21 +243,21 @@ html, body, #viewDiv {
 #raster-toggle {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 #raster-toggle label {
     font-weight: 600;
     color: #333;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 #raster-selector {
-    padding: 6px 10px;
+    padding: 5px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     background-color: #fff;
-    font-size: 14px;
+    font-size: 12px;
     cursor: pointer;
     transition: border-color 0.2s;
 }
@@ -241,28 +280,115 @@ html, body, #viewDiv {
 #feature-layer-toggle label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
+    gap: 6px;
+    font-size: 12px;
     color: #333;
     cursor: pointer;
+}
+
+#centroid-field-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#centroid-field-selector label {
+    font-weight: 600;
+    color: #333;
+    font-size: 12px;
+}
+
+#centroid-field-dropdown {
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+#centroid-field-dropdown:hover {
+    border-color: #999;
+}
+
+#centroid-field-dropdown:focus {
+    outline: none;
+    border-color: #0099ff;
+    box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+}
+
+#depth-statistics {
+    background-color: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    border-top: 2px solid #0099ff;
+    margin-top: 5px;
+}
+
+#depth-statistics h4 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#stats-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    color: #333;
+}
+
+.stat-color {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 1px;
+    border: 1px solid #999;
+    margin-right: 5px;
+    flex-shrink: 0;
+}
+
+.stat-label {
+    flex: 1;
+    font-size: 10px;
+}
+
+.stat-count {
+    font-weight: 600;
+    color: #0099ff;
+    font-size: 11px;
+    margin-left: 6px;
 }
 
 #opacity-control {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 #opacity-control label {
     font-weight: 600;
     color: #333;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 #opacity-container {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
 }
 
 #opacity-slider {
@@ -307,10 +433,10 @@ html, body, #viewDiv {
 }
 
 #opacity-value {
-    font-size: 13px;
+    font-size: 11px;
     color: #666;
     font-weight: 500;
-    min-width: 35px;
+    min-width: 30px;
     text-align: right;
 }
 

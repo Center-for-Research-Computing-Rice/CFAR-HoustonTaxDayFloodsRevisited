@@ -5,11 +5,9 @@ const [
     WebTileLayer,
     FeatureLayer,
     Basemap,
-    GraphicsLayer,
-    Graphic,
-    Point,
     Home,
-    Zoom
+    Zoom,
+    Search
 ] = await $arcgis.import([
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
@@ -17,11 +15,9 @@ const [
     "@arcgis/core/layers/WebTileLayer.js",
     "@arcgis/core/layers/FeatureLayer.js",
     "@arcgis/core/Basemap.js",
-    "@arcgis/core/layers/GraphicsLayer.js",
-    "@arcgis/core/Graphic.js",
-    "@arcgis/core/geometry/Point.js",
     "@arcgis/core/widgets/Home.js",
-    "@arcgis/core/widgets/Zoom.js"
+    "@arcgis/core/widgets/Zoom.js",
+    "@arcgis/core/widgets/Search.js"
 ]);
 
 const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
@@ -132,24 +128,15 @@ const overlayLayers = {
     centroids: new FeatureLayer({
         url: centroidServiceUrl,
         renderer: createCentroidRenderer(currentCentroidField),
-        visible: false,
-        popupTemplate: {
-            title: "Flood Depth",
-            content: [
-                {
-                    type: "text",
-                    text: "<b>Historic Flood Depth:</b> {TD_histori} ft<br><b>Transposed Flood Depth:</b> {TD_transpo} ft"
-                }
-            ]
-        }
+        visible: true,
+        popupEnabled: false,
+        outFields: ["OBJECTID", "TD_histori", "TD_transpo"]
     })
 };
 
-const searchLayer = new GraphicsLayer();
-
 const map = new ArcGISMap({
     basemap: createBasemap("cartodb-positron"),
-    layers: [overlayLayers.historic, overlayLayers.transposed, overlayLayers.centroids, searchLayer]
+    layers: [overlayLayers.historic, overlayLayers.transposed, overlayLayers.centroids]
 });
 
 const view = new MapView({
@@ -161,130 +148,245 @@ const view = new MapView({
 
 await view.when();
 
+const homesHoverPopup = document.getElementById("homes-hover-popup");
+
+function formatDepthFt(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(value);
+    if (Number.isNaN(n)) return "—";
+    return `${n.toFixed(1)} ft`;
+}
+
+let homesHoverActiveFeatureKey = null;
+
+function hideHomesHoverPopup() {
+    if (!homesHoverPopup) return;
+    homesHoverActiveFeatureKey = null;
+    homesHoverPopup.hidden = true;
+    homesHoverPopup.setAttribute("aria-hidden", "true");
+}
+
+function getHomesFeatureKey(graphic) {
+    if (!graphic) return null;
+    const layer = overlayLayers.centroids;
+    if (typeof layer.getObjectId === "function") {
+        try {
+            const id = layer.getObjectId(graphic);
+            if (id != null) return `oid:${id}`;
+        } catch {
+            /* ignore */
+        }
+    }
+    const a = graphic.attributes;
+    const oid = a?.OBJECTID ?? a?.FID ?? a?.objectid;
+    if (oid != null) return `oid:${oid}`;
+    const g = graphic.geometry;
+    if (g && g.type === "point" && Number.isFinite(g.x) && Number.isFinite(g.y)) {
+        return `xy:${g.x},${g.y}`;
+    }
+    return null;
+}
+
+function buildHomesHoverContent(historic, transposed) {
+    return `
+        <div class="homes-hover-popup__title">Flood depth</div>
+        <div class="homes-hover-popup__row">
+            <span class="homes-hover-popup__label">Historic Flood</span>
+            <span class="homes-hover-popup__value">${formatDepthFt(historic)}</span>
+        </div>
+        <div class="homes-hover-popup__row">
+            <span class="homes-hover-popup__label">Transposed Flood</span>
+            <span class="homes-hover-popup__value">${formatDepthFt(transposed)}</span>
+        </div>`;
+}
+
+function positionHomesHoverPopup(screenX, screenY) {
+    if (!homesHoverPopup || homesHoverPopup.hidden) return;
+    const wrap = homesHoverPopup.parentElement;
+    if (!wrap) return;
+    const pad = 14;
+    const w = homesHoverPopup.offsetWidth;
+    const h = homesHoverPopup.offsetHeight;
+    let left = screenX + pad;
+    let top = screenY + pad;
+    if (left + w > wrap.clientWidth - 8) {
+        left = Math.max(8, screenX - w - pad);
+    }
+    if (top + h > wrap.clientHeight - 8) {
+        top = Math.max(8, screenY - h - pad);
+    }
+    homesHoverPopup.style.left = `${left}px`;
+    homesHoverPopup.style.top = `${top}px`;
+}
+
+function showHomesHoverPopup(screenX, screenY, attrs) {
+    if (!homesHoverPopup) return;
+    const historic = attrs?.TD_histori;
+    const transposed = attrs?.TD_transpo;
+    homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transposed);
+    homesHoverPopup.hidden = false;
+    homesHoverPopup.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(() => positionHomesHoverPopup(screenX, screenY));
+}
+
+let homesHoverHitGeneration = 0;
+view.on("pointer-move", async (event) => {
+    if (!homesHoverPopup || !overlayLayers.centroids.visible) {
+        hideHomesHoverPopup();
+        view.container.style.cursor = "";
+        return;
+    }
+    const gen = ++homesHoverHitGeneration;
+    try {
+        const response = await view.hitTest(event, { include: overlayLayers.centroids });
+        if (gen !== homesHoverHitGeneration) return;
+        const hit = response.results.find((r) => r.graphic?.layer === overlayLayers.centroids);
+        if (hit?.graphic) {
+            view.container.style.cursor = "pointer";
+            const featureKey = getHomesFeatureKey(hit.graphic);
+            if (featureKey === homesHoverActiveFeatureKey && !homesHoverPopup.hidden) {
+                return;
+            }
+            homesHoverActiveFeatureKey = featureKey;
+            showHomesHoverPopup(event.x, event.y, hit.graphic.attributes);
+        } else {
+            view.container.style.cursor = "";
+            hideHomesHoverPopup();
+        }
+    } catch {
+        if (gen !== homesHoverHitGeneration) return;
+        view.container.style.cursor = "";
+        hideHomesHoverPopup();
+    }
+});
+
+view.on("pointer-leave", () => {
+    homesHoverHitGeneration += 1;
+    view.container.style.cursor = "";
+    hideHomesHoverPopup();
+});
+
 view.ui.empty("top-left");
 view.ui.empty("bottom-right");
-view.ui.add(new Home({ view }), "bottom-right");
-view.ui.add(new Zoom({ view }), "bottom-right");
+view.ui.add(new Home({ view }), "top-left");
+view.ui.add(new Zoom({ view }), "top-left");
 
-async function fetchFeatureStats(field) {
-    const query = overlayLayers.centroids.createQuery();
-    query.where = "1=1";
-    query.outFields = [field];
-    query.returnGeometry = false;
-
-    const result = await overlayLayers.centroids.queryFeatures(query);
-    return result.features;
-}
-
-function updateStatisticsDisplay(features, field) {
-    const stats = {
-        "No Flood": 0,
-        "Light (0-2 ft)": 0,
-        "Moderate (2-4 ft)": 0,
-        "Heavy (4-6 ft)": 0,
-        "Severe (6-8 ft)": 0,
-        "Extreme (8-10+ ft)": 0
-    };
-
-    const colors = {
-        "No Flood": "#ffffff",
-        "Light (0-2 ft)": "#ccffff",
-        "Moderate (2-4 ft)": "#66d9ff",
-        "Heavy (4-6 ft)": "#0099ff",
-        "Severe (6-8 ft)": "#0047b2",
-        "Extreme (8-10+ ft)": "#F523F5"
-    };
-
-    features.forEach((feature) => {
-        const depth = feature.attributes?.[field];
-        if (depth === null || depth === undefined) {
-            return;
-        }
-
-        if (depth <= 0) stats["No Flood"] += 1;
-        else if (depth <= 2) stats["Light (0-2 ft)"] += 1;
-        else if (depth <= 4) stats["Moderate (2-4 ft)"] += 1;
-        else if (depth <= 6) stats["Heavy (4-6 ft)"] += 1;
-        else if (depth <= 8) stats["Severe (6-8 ft)"] += 1;
-        else stats["Extreme (8-10+ ft)"] += 1;
-    });
-
-    const statsContent = document.getElementById("stats-content");
-    let html = "";
-    Object.entries(stats).forEach(([label, count]) => {
-        html += `<div class="stat-line">
-            <div>
-                <span class="stat-color" style="background-color: ${colors[label]};"></span>
-                <span class="stat-label">${label}</span>
-            </div>
-            <span class="stat-count">${count}</span>
-        </div>`;
-    });
-    statsContent.innerHTML = html;
-}
-
-async function refreshStatistics() {
-    try {
-        const features = await fetchFeatureStats(currentCentroidField);
-        updateStatisticsDisplay(features, currentCentroidField);
-    } catch (error) {
-        console.error("Error fetching features:", error);
+const searchWidget = new Search({
+    view,
+    container: "search-widget-container",
+    popupEnabled: true,
+    resultGraphicEnabled: true,
+    allPlaceholder: "Search address or place…",
+    goToOverride: (mapView, goToParams) => {
+        return mapView.goTo(goToParams.target, {
+            ...(goToParams.options || {}),
+            zoom: 15
+        });
     }
-}
+});
 
-await refreshStatistics();
+searchWidget.viewModel.location = view.center;
+view.watch("center", () => {
+    searchWidget.viewModel.location = view.center;
+});
 
 const basemapDropdown = document.getElementById("basemap-dropdown");
-const rasterSelector = document.getElementById("raster-selector");
+const scenarioButtons = document.querySelectorAll(".scenario-btn");
+const scenarioHint = document.getElementById("scenario-hint");
 const centroidsToggle = document.getElementById("centroids-toggle");
+const homesPointLegend = document.getElementById("homes-point-legend");
 const centroidFieldDropdown = document.getElementById("centroid-field-dropdown");
 const opacitySlider = document.getElementById("opacity-slider");
 const opacityValue = document.getElementById("opacity-value");
-const sidebarToggle = document.getElementById("sidebar-toggle");
-const sidebar = document.getElementById("sidebar");
 const controlsToggle = document.getElementById("controls-toggle");
 const controlsContent = document.getElementById("controls-content");
-const addressSearch = document.getElementById("address-search");
-const searchBtn = document.getElementById("search-btn");
 
-basemapDropdown.addEventListener("change", (event) => {
-    map.basemap = createBasemap(event.target.value);
-});
+function syncCentroidFieldDropdown() {
+    centroidFieldDropdown.value = currentCentroidField;
+}
 
-rasterSelector.addEventListener("change", async (event) => {
-    const selectedRaster = event.target.value;
+function updateScenarioUI(selectedRaster) {
+    scenarioButtons.forEach((btn) => {
+        const isActive = btn.dataset.scenario === selectedRaster;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
+    });
+    if (scenarioHint) {
+        if (selectedRaster === "historic") {
+            scenarioHint.textContent = "Showing: Historic baseline.";
+            scenarioHint.title =
+                "Modeled flood depths for typical conditions in this area—the historic baseline. Compare with Transposed to see Tax Day 2016 transposed here.";
+        } else {
+            scenarioHint.textContent = "Showing: Transposed Tax Day 2016.";
+            scenarioHint.title =
+                "Depths as if the April 2016 Tax Day flood were placed on this landscape. Contrast with Historic to see the difference from typical risk.";
+        }
+    }
+}
 
+function applyRasterScenario(selectedRaster) {
     overlayLayers.historic.visible = selectedRaster === "historic";
     overlayLayers.transposed.visible = selectedRaster === "transposed";
 
     if (selectedRaster === "historic") {
         currentCentroidField = "TD_histori";
-    } else if (selectedRaster === "transposed") {
+    } else {
         currentCentroidField = "TD_transpo";
     }
 
-    if (selectedRaster !== "none") {
-        currentFloodLayer = selectedRaster;
-        if (centroidsToggle.checked) {
-            overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
-        }
-        await refreshStatistics();
-    } else {
-        currentFloodLayer = "none";
-    }
-});
+    syncCentroidFieldDropdown();
+    updateScenarioUI(selectedRaster);
 
-centroidsToggle.addEventListener("change", (event) => {
-    overlayLayers.centroids.visible = event.target.checked;
-    if (event.target.checked) {
+    currentFloodLayer = selectedRaster;
+    const homesOn = centroidsToggle.getAttribute("aria-checked") === "true";
+    if (homesOn) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
+}
+
+basemapDropdown.addEventListener("change", (event) => {
+    map.basemap = createBasemap(event.target.value);
 });
 
-centroidFieldDropdown.addEventListener("change", async (event) => {
+scenarioButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        applyRasterScenario(btn.dataset.scenario);
+    });
+});
+
+updateScenarioUI("historic");
+syncCentroidFieldDropdown();
+
+function setHomesEnabled(on) {
+    overlayLayers.centroids.visible = on;
+    centroidsToggle.setAttribute("aria-checked", String(on));
+    centroidsToggle.classList.toggle("is-active", on);
+    if (homesPointLegend) {
+        homesPointLegend.hidden = !on;
+    }
+    if (!on) {
+        hideHomesHoverPopup();
+        if (view?.container) {
+            view.container.style.cursor = "";
+        }
+    }
+    if (on) {
+        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
+    }
+}
+
+centroidsToggle.addEventListener("click", () => {
+    const next = centroidsToggle.getAttribute("aria-checked") !== "true";
+    setHomesEnabled(next);
+});
+
+setHomesEnabled(true);
+
+centroidFieldDropdown.addEventListener("change", (event) => {
     currentCentroidField = event.target.value;
-    overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
-    await refreshStatistics();
+    if (centroidsToggle.getAttribute("aria-checked") === "true") {
+        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
+    }
 });
 
 opacitySlider.addEventListener("input", (event) => {
@@ -295,78 +397,96 @@ opacitySlider.addEventListener("input", (event) => {
     opacityValue.textContent = `${100 - transparency}%`;
 });
 
-sidebarToggle.addEventListener("click", () => {
-    sidebar.classList.toggle("collapsed");
-    sidebarToggle.textContent = sidebar.classList.contains("collapsed") ? "›" : "‹";
-    view.resize();
-});
-
 controlsToggle.addEventListener("click", () => {
     controlsContent.classList.toggle("collapsed");
     const arrow = controlsToggle.textContent.includes("▲") ? "▼" : "▲";
-    controlsToggle.textContent = `⚙ Settings ${arrow}`;
+    controlsToggle.textContent = `Map options ${arrow}`;
 });
 
-async function searchAddress(address) {
-    const query = `${address}, Houston, Texas`;
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!data.length) {
-            alert("Address not found");
-            return;
-        }
-
-        const result = data[0];
-        const latitude = Number.parseFloat(result.lat);
-        const longitude = Number.parseFloat(result.lon);
-
-        await view.goTo({ center: [longitude, latitude], zoom: 15 });
-
-        searchLayer.removeAll();
-        const marker = new Graphic({
-            geometry: new Point({ longitude, latitude }),
-            symbol: {
-                type: "simple-marker",
-                size: 10,
-                color: "#FF0000",
-                outline: { color: "#000000", width: 1 }
-            },
-            popupTemplate: {
-                title: "Search Result",
-                content: result.display_name
-            }
-        });
-        searchLayer.add(marker);
-        view.popup.open({
-            location: marker.geometry,
-            title: "Search Result",
-            content: result.display_name
-        });
-    } catch (error) {
-        console.error("Search error:", error);
-        alert("Error searching address");
+function positionTipBubble(wrap) {
+    const btn = wrap.querySelector(".tip-trigger");
+    const bubble = wrap.querySelector(".tip-bubble");
+    if (!btn || !bubble) {
+        return;
+    }
+    const br = btn.getBoundingClientRect();
+    const margin = 8;
+    const maxW = 252;
+    const w = Math.min(maxW, window.innerWidth - 2 * margin);
+    let left = br.right - w;
+    left = Math.max(margin, Math.min(left, window.innerWidth - margin - w));
+    const gap = 6;
+    let top = br.bottom + gap;
+    bubble.style.width = `${w}px`;
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+    const h = bubble.offsetHeight;
+    if (top + h > window.innerHeight - margin) {
+        top = Math.max(margin, br.top - h - gap);
+        bubble.style.top = `${top}px`;
     }
 }
 
-searchBtn.addEventListener("click", () => {
-    const address = addressSearch.value.trim();
-    if (address) {
-        searchAddress(address);
-    }
-});
-
-addressSearch.addEventListener("keypress", (event) => {
-    if (event.key === "Enter") {
-        const address = addressSearch.value.trim();
-        if (address) {
-            searchAddress(address);
+function repositionVisibleTips() {
+    document.querySelectorAll(".tip-wrap").forEach((wrap) => {
+        if (wrap.matches(":hover") || wrap.classList.contains("has-open-tip")) {
+            positionTipBubble(wrap);
         }
-    }
-});
+    });
+}
+
+function initHelpTooltips() {
+    document.querySelectorAll(".tip-wrap").forEach((wrap) => {
+        const btn = wrap.querySelector(".tip-trigger");
+        if (!btn) {
+            return;
+        }
+
+        wrap.addEventListener("mouseenter", () => {
+            positionTipBubble(wrap);
+        });
+        wrap.addEventListener("focusin", () => {
+            positionTipBubble(wrap);
+        });
+
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const wasOpen = wrap.classList.contains("has-open-tip");
+            document.querySelectorAll(".tip-wrap.has-open-tip").forEach((w) => {
+                w.classList.remove("has-open-tip");
+                w.querySelector(".tip-trigger")?.setAttribute("aria-expanded", "false");
+            });
+            if (!wasOpen) {
+                positionTipBubble(wrap);
+                wrap.classList.add("has-open-tip");
+                btn.setAttribute("aria-expanded", "true");
+            }
+        });
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!e.target.closest(".tip-wrap")) {
+            document.querySelectorAll(".tip-wrap.has-open-tip").forEach((w) => {
+                w.classList.remove("has-open-tip");
+                w.querySelector(".tip-trigger")?.setAttribute("aria-expanded", "false");
+            });
+        }
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            document.querySelectorAll(".tip-wrap.has-open-tip").forEach((w) => {
+                w.classList.remove("has-open-tip");
+                w.querySelector(".tip-trigger")?.setAttribute("aria-expanded", "false");
+            });
+        }
+    });
+
+    window.addEventListener("resize", repositionVisibleTips);
+    document.addEventListener("scroll", repositionVisibleTips, true);
+}
+
+initHelpTooltips();
 
 window.arcgisMap = map;
 window.arcgisView = view;

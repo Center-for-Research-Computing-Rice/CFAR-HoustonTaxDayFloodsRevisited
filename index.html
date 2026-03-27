@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Houston Flood Visualization</title>
+    <title>Tax Day Floods Revisited — Clear Creek</title>
     
     <!-- ArcGIS JavaScript API v5 -->
     <link rel="stylesheet" href="https://js.arcgis.com/5.0/esri/themes/light/main.css" />
@@ -16,70 +16,167 @@
     <div id="map-container">
         <div id="sidebar">
             <div id="sidebar-header">
-                <h1>Houston's Tax Day Floods Revisited</h1>
-                <button id="sidebar-toggle" class="sidebar-toggle-btn">‹</button>
+                <div class="sidebar-title-block">
+                    <span class="sidebar-kicker">Houston · Clear Creek</span>
+                    <h1>Tax Day Floods Revisited</h1>
+                </div>
             </div>
-            <div id="info-panel">
-                <p>Visualizing flood data for Clear Creek, Houston, Texas</p>
-            </div>
-            <div id="search-panel">
-                <input type="text" id="address-search" placeholder="Search address..." />
-                <button id="search-btn">Search</button>
-            </div>
-            <div id="controls-panel">
-                <button id="controls-toggle" class="toggle-btn">⚙ Settings ▼</button>
-                <div id="controls-content">
-                    <div id="basemap-selector">
-                        <label for="basemap-dropdown">Basemap:</label>
-                        <select id="basemap-dropdown">
-                            <option value="cartodb-positron">CartoDB Positron</option>
-                            <option value="osm">OpenStreetMap</option>
-                            <option value="cartodb-voyager">CartoDB Voyager</option>
-                            <option value="esri-aerial">Satellite</option>
-                            <option value="usgs-topo">USGS Topographic</option>
-                        </select>
+
+            <div class="sidebar-body">
+                <details class="panel-details">
+                    <summary class="panel-details-summary">About this comparison</summary>
+                    <div class="panel-details-body">
+                        <h2 id="narrative-heading" class="visually-hidden">Two floods, one map</h2>
+                        <p class="narrative-lede">
+                            In <strong>April 2016</strong>, the Tax Day storm brought historic flooding to parts of the Houston region.
+                            This map compares <em>typical</em> flood exposure in Clear Creek with what that 2016 Tax Day flood would look like if transposed here.
+                        </p>
+                        <ul class="narrative-list">
+                            <li><span class="narrative-term">Historic</span> — Modeled depths for how this area usually floods.</li>
+                            <li><span class="narrative-term">Transposed</span> — Depths if the 2016 Tax Day flood pattern were applied here.</li>
+                        </ul>
                     </div>
-                    <div id="raster-toggle">
-                        <label for="raster-selector">Flood Rasters:</label>
-                        <select id="raster-selector">
-                            
-                            <option value="historic">Historic Flood Data</option>
-                            <option value="transposed">Transposed Flood Data</option>
-                            <option value="none">None</option>
-                        </select>
+                </details>
+
+                <section class="narrative-step narrative-step--tight" aria-labelledby="step-scenario">
+                    <div class="step-header-row">
+                        <h3 id="step-scenario" class="step-title step-title--inline">Scenario</h3>
+                        <span class="tip-wrap">
+                            <button
+                                type="button"
+                                class="tip-trigger"
+                                id="tip-btn-scenario"
+                                aria-label="Help: choosing a scenario"
+                                aria-expanded="false"
+                                aria-controls="tip-scenario"
+                            >?</button>
+                            <div id="tip-scenario" class="tip-bubble" role="tooltip">
+                                Pick <strong>Historic</strong> (typical risk here) or <strong>Transposed</strong> (Tax Day 2016 placed on this geography). The flood raster on the map follows your choice.
+                                Use <strong>Flood opacity</strong> to fade the raster and see streets underneath. Affected home points follow the same scenario.
+                            </div>
+                        </span>
+                    </div>
+                    <div class="scenario-picker" role="group" aria-label="Flood scenario">
+                        <button
+                            type="button"
+                            class="scenario-btn is-active"
+                            data-scenario="historic"
+                            aria-pressed="true"
+                            title="Typical / modeled flood depths for this area (historic baseline)."
+                        >
+                            <span class="scenario-btn-title">Historic</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="scenario-btn"
+                            data-scenario="transposed"
+                            aria-pressed="false"
+                            title="Depths if the April 2016 Tax Day flood were placed on this landscape."
+                        >
+                            <span class="scenario-btn-title">Transposed</span>
+                        </button>
                     </div>
                     <div id="opacity-control">
-                        <label for="opacity-slider">Transparency:</label>
+                        <label for="opacity-slider">Flood opacity</label>
                         <div id="opacity-container">
                             <input type="range" id="opacity-slider" min="0" max="100" value="30" />
                             <span id="opacity-value">70%</span>
                         </div>
                     </div>
-                    <div id="feature-layer-toggle">
-                        <label>
-                            <input type="checkbox" id="centroids-toggle" />
-                            Show Centroids (Feature Layer)
-                        </label>
+                    <p id="scenario-hint" class="scenario-hint scenario-hint--compact" role="status"></p>
+                </section>
+
+                <section class="narrative-step narrative-step--tight" aria-labelledby="step-layer-homes">
+                    <div class="step-header-row homes-step-header">
+                        <div class="homes-step-header__title-group">
+                            <h3 id="step-layer-homes" class="step-title step-title--inline">Affected Homes</h3>
+                            <button
+                                type="button"
+                                id="centroids-toggle"
+                                class="homes-visibility-switch is-active"
+                                role="switch"
+                                aria-checked="true"
+                                aria-label="Show affected home points on the map"
+                            ></button>
+                        </div>
+                        <span class="tip-wrap">
+                            <button
+                                type="button"
+                                class="tip-trigger"
+                                id="tip-btn-homes"
+                                aria-label="Help: affected home points on the map"
+                                aria-expanded="false"
+                                aria-controls="tip-homes"
+                            >?</button>
+                            <div id="tip-homes" class="tip-bubble" role="tooltip">
+                                Each point is a single-family home. <strong>White</strong> = not flooded in the selected scenario; <strong>orange</strong> = flooded.
+                            </div>
+                        </span>
                     </div>
-                    <div id="centroid-field-selector">
-                        <label for="centroid-field-dropdown">Single Family Homes:</label>
-                        <select id="centroid-field-dropdown">
-                            <option value="TD_histori">Historic Flood Data</option>
-                            <option value="TD_transpo">Transposed Flood Data</option>
-                        </select>
+                    <div id="homes-control-block" class="homes-control-block">
+                        <div id="homes-point-legend" class="homes-legend" role="group" aria-label="Legend for affected home points">
+                            <div class="homes-legend-item">
+                                <span class="homes-legend-swatch homes-legend-swatch--not-flooded" aria-hidden="true"></span>
+                                <span class="homes-legend-label">Not flooded</span>
+                            </div>
+                            <div class="homes-legend-item">
+                                <span class="homes-legend-swatch homes-legend-swatch--flooded" aria-hidden="true"></span>
+                                <span class="homes-legend-label">Flooded</span>
+                            </div>
+                        </div>
                     </div>
-                    <div id="depth-statistics">
-                        <h4>Single Family Home Count by Depth</h4>
-                        <div id="stats-content">
-                            <p style="color: #888; font-size: 12px;">Load centroids to view statistics</p>
+                </section>
+
+                <section class="narrative-search narrative-search--tight" aria-labelledby="search-heading">
+                    <div class="step-header-row search-heading-row">
+                        <h3 id="search-heading" class="search-heading-row__title">Address</h3>
+                        <span class="tip-wrap">
+                            <button
+                                type="button"
+                                class="tip-trigger"
+                                id="tip-btn-search"
+                                aria-label="Help: search"
+                                aria-expanded="false"
+                                aria-controls="tip-search"
+                            >?</button>
+                            <div id="tip-search" class="tip-bubble" role="tooltip">
+                                ArcGIS geocoding: type an address or place, pick a suggestion, and the map zooms to the result (zoom 15). Results are biased toward the current map area.
+                            </div>
+                        </span>
+                    </div>
+                    <div id="search-widget-container"></div>
+                </section>
+
+                <div id="controls-panel">
+                    <button id="controls-toggle" class="toggle-btn" type="button">Map options ▼</button>
+                    <div id="controls-content">
+                        <div id="basemap-selector">
+                            <label for="basemap-dropdown">Basemap</label>
+                            <select id="basemap-dropdown">
+                                <option value="cartodb-positron">CartoDB Positron</option>
+                                <option value="osm">OpenStreetMap</option>
+                                <option value="cartodb-voyager">CartoDB Voyager</option>
+                                <option value="esri-aerial">Satellite</option>
+                                <option value="usgs-topo">USGS Topographic</option>
+                            </select>
+                        </div>
+                        <div id="centroid-field-selector" class="advanced-field">
+                            <label for="centroid-field-dropdown" title="Usually matches the scenario you picked. Override to color points by the other flood-depth field while keeping the same flood raster.">Point field (advanced)</label>
+                            <select id="centroid-field-dropdown">
+                                <option value="TD_histori">Historic</option>
+                                <option value="TD_transpo">Transposed</option>
+                            </select>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div id="viewDiv"></div>
+        <div class="map-view-wrap">
+            <div id="viewDiv"></div>
+            <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
+        </div>
         <div id="flood-legend">
-            <h3>Flood Intensity</h3>
+            <h3>Flood Depth</h3>
             <div class="legend-item" data-color="0">
                 <span class="legend-color" style="background-color: #ffffff;"></span>
                 <div class="legend-text">
@@ -125,7 +222,6 @@
         </div>
     </div>
 
-    <!-- Local JavaScript -->
     <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -154,6 +154,7 @@ function formatDepthFt(value) {
     if (value === null || value === undefined || value === "") return "—";
     const n = Number(value);
     if (Number.isNaN(n)) return "—";
+    if (n === -9999) return "No Data";
     return `${n.toFixed(1)} ft`;
 }
 
@@ -230,25 +231,50 @@ function showHomesHoverPopup(screenX, screenY, attrs) {
 }
 
 let homesHoverHitGeneration = 0;
-view.on("pointer-move", async (event) => {
-    if (!homesHoverPopup || !overlayLayers.centroids.visible) {
-        hideHomesHoverPopup();
-        view.container.style.cursor = "";
-        return;
+let homesHoverRafId = null;
+let homesHoverCoalesceEvent = null;
+
+function cancelHomesHoverPoll() {
+    if (homesHoverRafId != null) {
+        cancelAnimationFrame(homesHoverRafId);
+        homesHoverRafId = null;
     }
+    homesHoverCoalesceEvent = null;
+    homesHoverHitGeneration += 1;
+}
+
+function scheduleHomesHoverHitTest() {
+    if (homesHoverRafId != null) return;
+    homesHoverRafId = requestAnimationFrame(() => {
+        homesHoverRafId = null;
+        const evt = homesHoverCoalesceEvent;
+        if (!evt || !homesHoverPopup || !overlayLayers.centroids.visible) return;
+        void runHomesHoverHitTest(evt);
+    });
+}
+
+async function runHomesHoverHitTest(event) {
     const gen = ++homesHoverHitGeneration;
+    const ex = event.x;
+    const ey = event.y;
     try {
         const response = await view.hitTest(event, { include: overlayLayers.centroids });
         if (gen !== homesHoverHitGeneration) return;
+        if (!overlayLayers.centroids.visible) {
+            view.container.style.cursor = "";
+            hideHomesHoverPopup();
+            return;
+        }
         const hit = response.results.find((r) => r.graphic?.layer === overlayLayers.centroids);
         if (hit?.graphic) {
             view.container.style.cursor = "pointer";
             const featureKey = getHomesFeatureKey(hit.graphic);
             if (featureKey === homesHoverActiveFeatureKey && !homesHoverPopup.hidden) {
-                return;
+                /* same point: keep fixed popup; still allow follow-up if pointer moved */
+            } else {
+                homesHoverActiveFeatureKey = featureKey;
+                showHomesHoverPopup(event.x, event.y, hit.graphic.attributes);
             }
-            homesHoverActiveFeatureKey = featureKey;
-            showHomesHoverPopup(event.x, event.y, hit.graphic.attributes);
         } else {
             view.container.style.cursor = "";
             hideHomesHoverPopup();
@@ -258,10 +284,31 @@ view.on("pointer-move", async (event) => {
         view.container.style.cursor = "";
         hideHomesHoverPopup();
     }
+
+    const latest = homesHoverCoalesceEvent;
+    if (
+        latest &&
+        homesHoverPopup &&
+        overlayLayers.centroids.visible &&
+        (latest.x !== ex || latest.y !== ey)
+    ) {
+        scheduleHomesHoverHitTest();
+    }
+}
+
+view.on("pointer-move", (event) => {
+    if (!homesHoverPopup || !overlayLayers.centroids.visible) {
+        cancelHomesHoverPoll();
+        hideHomesHoverPopup();
+        view.container.style.cursor = "";
+        return;
+    }
+    homesHoverCoalesceEvent = event;
+    scheduleHomesHoverHitTest();
 });
 
 view.on("pointer-leave", () => {
-    homesHoverHitGeneration += 1;
+    cancelHomesHoverPoll();
     view.container.style.cursor = "";
     hideHomesHoverPopup();
 });
@@ -365,6 +412,7 @@ function setHomesEnabled(on) {
         homesPointLegend.hidden = !on;
     }
     if (!on) {
+        cancelHomesHoverPoll();
         hideHomesHoverPopup();
         if (view?.container) {
             view.container.style.cursor = "";

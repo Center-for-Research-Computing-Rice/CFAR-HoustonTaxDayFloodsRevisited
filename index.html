@@ -23,7 +23,7 @@
             </div>
 
             <div class="sidebar-body">
-                <details class="panel-details">
+                <details class="panel-details" open>
                     <summary class="panel-details-summary">About this comparison</summary>
                     <div class="panel-details-body">
                         <h2 id="narrative-heading" class="visually-hidden">Two floods, one map</h2>
@@ -116,12 +116,12 @@
                     <div id="homes-control-block" class="homes-control-block">
                         <div id="homes-point-legend" class="homes-legend" role="group" aria-label="Legend for affected home points">
                             <div class="homes-legend-item">
-                                <span class="homes-legend-swatch homes-legend-swatch--not-flooded" aria-hidden="true"></span>
-                                <span class="homes-legend-label">Not flooded</span>
-                            </div>
-                            <div class="homes-legend-item">
                                 <span class="homes-legend-swatch homes-legend-swatch--flooded" aria-hidden="true"></span>
                                 <span class="homes-legend-label">Flooded</span>
+                            </div>
+                            <div class="homes-legend-item">
+                                <span class="homes-legend-swatch homes-legend-swatch--not-flooded" aria-hidden="true"></span>
+                                <span class="homes-legend-label">Not flooded</span>
                             </div>
                         </div>
                     </div>
@@ -148,8 +148,8 @@
                 </section>
 
                 <div id="controls-panel">
-                    <button id="controls-toggle" class="toggle-btn" type="button">Map options ▼</button>
-                    <div id="controls-content">
+                    <button id="controls-toggle" class="toggle-btn" type="button">Map options ▲</button>
+                    <div id="controls-content" class="collapsed">
                         <div id="basemap-selector">
                             <label for="basemap-dropdown">Basemap</label>
                             <select id="basemap-dropdown">

@@ -2,6 +2,7 @@ const [
     ArcGISMap,
     MapView,
     TileLayer,
+    BaseTileLayer,
     WebTileLayer,
     FeatureLayer,
     Basemap,
@@ -12,6 +13,7 @@ const [
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
     "@arcgis/core/layers/TileLayer.js",
+    "@arcgis/core/layers/BaseTileLayer.js",
     "@arcgis/core/layers/WebTileLayer.js",
     "@arcgis/core/layers/FeatureLayer.js",
     "@arcgis/core/Basemap.js",
@@ -23,6 +25,10 @@ const [
 const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
 const homeZoom = 12;
 const centroidServiceUrl = "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0";
+const historicFloodServiceUrl =
+    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_Clip2/MapServer";
+const transposedFloodServiceUrl =
+    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_Clip/MapServer";
 
 function getFloodColor(depth) {
     if (depth === null || depth === undefined) return "#cccccc";
@@ -114,14 +120,108 @@ function createCentroidRenderer(fieldName) {
     };
 }
 
+const FLOOD_TILE_PALETTE = [
+    { r: 255, g: 255, b: 255, depth: 0 },
+    { r: 204, g: 255, b: 255, depth: 1 },
+    { r: 102, g: 217, b: 255, depth: 3 },
+    { r: 0, g: 153, b: 255, depth: 5 },
+    { r: 0, g: 71, b: 178, depth: 7 },
+    { r: 245, g: 35, b: 245, depth: 9 }
+];
+
+const FLOOD_TILE_PALETTE_MAX_DIST2 = 11000;
+
+function nearestPaletteDepthForTile(r, g, b) {
+    let bestDepth = 0;
+    let bestDist = Infinity;
+    for (const p of FLOOD_TILE_PALETTE) {
+        const d = (r - p.r) ** 2 + (g - p.g) ** 2 + (b - p.b) ** 2;
+        if (d < bestDist) {
+            bestDist = d;
+            bestDepth = p.depth;
+        }
+    }
+    if (bestDist > FLOOD_TILE_PALETTE_MAX_DIST2) return 0;
+    return bestDepth;
+}
+
+class DepthFilterFloodTileLayer extends BaseTileLayer {
+    constructor({ tileServiceRoot, minDepthFt, spatialReference, fullExtent, tileInfo, ...layerOptions }) {
+        super({
+            spatialReference,
+            fullExtent,
+            tileInfo,
+            ...layerOptions
+        });
+        this.tileServiceRoot = tileServiceRoot.replace(/\/$/, "");
+        this.minDepthFt = minDepthFt ?? 0;
+    }
+
+    getTileUrl(level, row, col) {
+        return `${this.tileServiceRoot}/tile/${level}/${row}/${col}`;
+    }
+
+    fetchTile(level, row, col, options) {
+        const url = this.getTileUrl(level, row, col);
+        return fetch(url, { signal: options?.signal })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(String(response.status));
+                }
+                return response.blob();
+            })
+            .then((blob) => createImageBitmap(blob))
+            .then((imageBitmap) => {
+                const w = imageBitmap.width;
+                const h = imageBitmap.height;
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                    imageBitmap.close();
+                    throw new Error("Canvas 2D unavailable");
+                }
+                ctx.drawImage(imageBitmap, 0, 0);
+                imageBitmap.close();
+                const minDepth = this.minDepthFt ?? 0;
+                if (minDepth > 0) {
+                    const imageData = ctx.getImageData(0, 0, w, h);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const est = nearestPaletteDepthForTile(data[i], data[i + 1], data[i + 2]);
+                        if (est + 1e-6 < minDepth) {
+                            data[i + 3] = 0;
+                        }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                }
+                return canvas;
+            });
+    }
+}
+
+const [historicFloodMeta, transposedFloodMeta] = await Promise.all([
+    fetch(`${historicFloodServiceUrl}?f=json`).then((r) => r.json()),
+    fetch(`${transposedFloodServiceUrl}?f=json`).then((r) => r.json())
+]);
+
 const overlayLayers = {
-    historic: new TileLayer({
-        url: "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_Clip2/MapServer",
+    historic: new DepthFilterFloodTileLayer({
+        tileServiceRoot: historicFloodServiceUrl,
+        minDepthFt: 0,
+        spatialReference: historicFloodMeta.spatialReference,
+        fullExtent: historicFloodMeta.fullExtent,
+        tileInfo: historicFloodMeta.tileInfo,
         opacity: 0.7,
         visible: true
     }),
-    transposed: new TileLayer({
-        url: "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_Clip/MapServer",
+    transposed: new DepthFilterFloodTileLayer({
+        tileServiceRoot: transposedFloodServiceUrl,
+        minDepthFt: 0,
+        spatialReference: transposedFloodMeta.spatialReference,
+        fullExtent: transposedFloodMeta.fullExtent,
+        tileInfo: transposedFloodMeta.tileInfo,
         opacity: 0.7,
         visible: false
     }),
@@ -345,6 +445,8 @@ const homesPointLegend = document.getElementById("homes-point-legend");
 const centroidFieldDropdown = document.getElementById("centroid-field-dropdown");
 const opacitySlider = document.getElementById("opacity-slider");
 const opacityValue = document.getElementById("opacity-value");
+const depthFilterSlider = document.getElementById("depth-filter-slider");
+const depthFilterValue = document.getElementById("depth-filter-value");
 const controlsToggle = document.getElementById("controls-toggle");
 const controlsContent = document.getElementById("controls-content");
 
@@ -444,6 +546,22 @@ opacitySlider.addEventListener("input", (event) => {
     overlayLayers.transposed.opacity = opacity;
     opacityValue.textContent = `${100 - transparency}%`;
 });
+
+function applyFloodMinDepthFt(minFt) {
+    const v = Math.max(0, Number(minFt) || 0);
+    overlayLayers.historic.minDepthFt = v;
+    overlayLayers.transposed.minDepthFt = v;
+    overlayLayers.historic.refresh();
+    overlayLayers.transposed.refresh();
+}
+
+if (depthFilterSlider && depthFilterValue) {
+    depthFilterSlider.addEventListener("input", (event) => {
+        const v = Number.parseFloat(event.target.value);
+        depthFilterValue.textContent = `${v.toFixed(1)} ft`;
+        applyFloodMinDepthFt(v);
+    });
+}
 
 controlsToggle.addEventListener("click", () => {
     controlsContent.classList.toggle("collapsed");

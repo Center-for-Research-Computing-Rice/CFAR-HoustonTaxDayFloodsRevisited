@@ -81,6 +81,22 @@ const overlayLayers = {
         opacity: 0.7,
         attribution: '© ArcGIS',
         name: 'Transposed Flood Data'
+    }),
+    centroids: L.esri.featureLayer({
+        url: 'https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0',
+        pointToLayer: function(feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 4,
+                fillColor: '#FF6B6B',
+                color: '#FF6B6B',
+                weight: 1,
+                opacity: 0.8,
+                fillOpacity: 0.8
+            });
+        },
+        onEachFeature: function(feature, layer) {
+            layer.bindPopup(`ID: ${feature.id}`);
+        }
     })
 };
 
@@ -127,6 +143,39 @@ rasterSelector.addEventListener('change', function(event) {
     
     currentFloodLayer = selectedRaster;
     console.log('Raster layer changed to:', selectedRaster);
+});
+
+// Feature layer (centroids) toggle functionality
+const centroidsToggle = document.getElementById('centroids-toggle');
+
+centroidsToggle.addEventListener('change', function(event) {
+    if (event.target.checked) {
+        overlayLayers.centroids.addTo(map);
+        console.log('Centroids feature layer added');
+    } else {
+        if (map.hasLayer(overlayLayers.centroids)) {
+            map.removeLayer(overlayLayers.centroids);
+        }
+        console.log('Centroids feature layer removed');
+    }
+});
+
+// Opacity/Transparency slider functionality
+const opacitySlider = document.getElementById('opacity-slider');
+const opacityValue = document.getElementById('opacity-value');
+
+opacitySlider.addEventListener('input', function(event) {
+    const transparency = parseInt(event.target.value);
+    const opacity = (100 - transparency) / 100;
+    
+    // Update opacity for both raster layers
+    overlayLayers.historic.setOpacity(opacity);
+    overlayLayers.transposed.setOpacity(opacity);
+    
+    // Update display value
+    opacityValue.textContent = (100 - transparency) + '%';
+    
+    console.log('Raster layer opacity changed to:', opacity);
 });
 
 // Controls panel toggle functionality

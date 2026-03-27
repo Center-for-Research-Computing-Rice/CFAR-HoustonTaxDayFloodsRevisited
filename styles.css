@@ -16,9 +16,23 @@ html, body, #viewDiv {
     position: relative;
     width: 100%;
     height: 100vh;
+    display: flex;
+}
+
+#sidebar {
+    width: 350px;
+    background-color: #f9f9f9;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    z-index: 200;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 #viewDiv {
+    flex: 1;
     border-radius: 0;
     position: relative;
     z-index: 0;
@@ -57,15 +71,10 @@ html, body, #viewDiv {
 }
 
 #info-panel {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background-color: rgba(255, 255, 255, 0.95);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 100;
-    max-width: 300px;
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     font-size: 14px;
 }
 
@@ -81,15 +90,12 @@ html, body, #viewDiv {
 }
 
 #search-panel {
-    position: absolute;
-    top: 180px;
-    left: 20px;
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: #ffffff;
     padding: 12px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 100;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
+    flex-direction: column;
     gap: 8px;
 }
 
@@ -98,7 +104,7 @@ html, body, #viewDiv {
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 14px;
-    width: 200px;
+    width: 100%;
     transition: border-color 0.2s;
 }
 
@@ -129,13 +135,9 @@ html, body, #viewDiv {
 }
 
 #controls-panel {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background-color: rgba(255, 255, 255, 0.95);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 100;
+    background-color: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
@@ -169,7 +171,7 @@ html, body, #viewDiv {
 
 #basemap-selector {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
 }
 
@@ -177,7 +179,6 @@ html, body, #viewDiv {
     font-weight: 600;
     color: #333;
     font-size: 14px;
-    white-space: nowrap;
 }
 
 #basemap-dropdown {
@@ -200,35 +201,9 @@ html, body, #viewDiv {
     box-shadow: 0 0 0 3px rgba(0, 121, 193, 0.1);
 }
 
-#current-basemap {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    padding: 10px 15px;
-    border-radius: 4px;
-    font-size: 12px;
-    z-index: 100;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-}
-
-#flood-legend {
-    position: absolute;
-    bottom: 80px;
-    left: 20px;
-    background-color: rgba(255, 255, 255, 0.95);
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 100;
-    min-width: 200px;
-}
-
 #raster-toggle {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
 }
 
@@ -236,7 +211,6 @@ html, body, #viewDiv {
     font-weight: 600;
     color: #333;
     font-size: 14px;
-    white-space: nowrap;
 }
 
 #raster-selector {
@@ -259,12 +233,93 @@ html, body, #viewDiv {
     box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
 }
 
+#feature-layer-toggle {
+    display: flex;
+    align-items: center;
+}
+
+#feature-layer-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+}
+
+#opacity-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#opacity-control label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+#opacity-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#opacity-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0099ff;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s;
+}
+
+#opacity-slider::-webkit-slider-thumb:hover {
+    background: #0079c1;
+}
+
+#opacity-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0099ff;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s;
+}
+
+#opacity-slider::-moz-range-thumb:hover {
+    background: #0079c1;
+}
+
+#opacity-value {
+    font-size: 13px;
+    color: #666;
+    font-weight: 500;
+    min-width: 35px;
+    text-align: right;
+}
+
 #flood-legend {
     position: absolute;
     bottom: 20px;
-    left: 50%;
+    left: calc(350px + (100vw - 350px) / 2);
     transform: translateX(-50%);
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: rgba(255, 255, 255, 0.4);
     padding: 12px 20px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -294,42 +349,69 @@ html, body, #viewDiv {
     border-radius: 0;
 }
 
+#flood-legend h3 {
+    font-size: 14px;
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+    border-right: 2px solid #0099ff;
+    padding-right: 20px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+}
+
 .legend-color {
     display: inline-block;
     width: 16px;
     height: 16px;
-    border: 1px solid #ccc;
-    border-radius: 2px;
-    flex-shrink: 0;
-}
-
-.legend-label {
-    font-size: 12px;
-    color: #333;
-    font-weight: 500;
-    white-space: nowrap;
+    border: 1px solid #999;
 }
 
 .legend-text {
     display: flex;
-    flex-direction: row;
-    gap: 4px;
-    align-items: center;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+.legend-label {
+    font-weight: 500;
+    color: #333;
 }
 
 .legend-depth {
-    font-size: 11px;
     color: #666;
-    font-weight: 400;
-    white-space: nowrap;
+    font-size: 11px;
+}
+
+/* Sidebar scrollbar styling */
+#sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: #999;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    #info-panel {
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        max-width: none;
+    #sidebar {
+        width: 300px;
     }
 }

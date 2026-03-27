@@ -9,42 +9,60 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     
+    <!-- Leaflet-ESRI Plugin for ArcGIS Feature Layers -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    
     <!-- Local CSS -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="map-container">
-        <div id="viewDiv"></div>
-        <div id="info-panel">
-            <h1>Houston Flood Information</h1>
-            <p>Visualizing flood data for Houston, Texas</p>
-        </div>
-        <div id="search-panel">
-            <input type="text" id="address-search" placeholder="Search address..." />
-            <button id="search-btn">Search</button>
-        </div>
-        <div id="controls-panel">
-            <button id="controls-toggle" class="toggle-btn">⚙ Settings ▼</button>
-            <div id="controls-content">
-                <div id="basemap-selector">
-                    <label for="basemap-dropdown">Basemap:</label>
-                    <select id="basemap-dropdown">
-                        <option value="cartodb-positron">CartoDB Positron</option>
-                        <option value="osm">OpenStreetMap</option>
-                        <option value="cartodb-voyager">CartoDB Voyager</option>
-                        <option value="esri-aerial">Satellite</option>
-                        <option value="usgs-topo">USGS Topographic</option>
-                    </select>
-                </div>
-                <div id="raster-toggle">
-                    <label for="raster-selector">Raster Layer:</label>
-                    <select id="raster-selector">
-                        <option value="historic">Historic Flood Data</option>
-                        <option value="transposed">Transposed Flood Data</option>
-                    </select>
+        <div id="sidebar">
+            <div id="info-panel">
+                <h1>Houston Flood Information</h1>
+                <p>Visualizing flood data for Houston, Texas</p>
+            </div>
+            <div id="search-panel">
+                <input type="text" id="address-search" placeholder="Search address..." />
+                <button id="search-btn">Search</button>
+            </div>
+            <div id="controls-panel">
+                <button id="controls-toggle" class="toggle-btn">⚙ Settings ▼</button>
+                <div id="controls-content">
+                    <div id="basemap-selector">
+                        <label for="basemap-dropdown">Basemap:</label>
+                        <select id="basemap-dropdown">
+                            <option value="cartodb-positron">CartoDB Positron</option>
+                            <option value="osm">OpenStreetMap</option>
+                            <option value="cartodb-voyager">CartoDB Voyager</option>
+                            <option value="esri-aerial">Satellite</option>
+                            <option value="usgs-topo">USGS Topographic</option>
+                        </select>
+                    </div>
+                    <div id="raster-toggle">
+                        <label for="raster-selector">Raster Layer:</label>
+                        <select id="raster-selector">
+                            <option value="historic">Historic Flood Data</option>
+                            <option value="transposed">Transposed Flood Data</option>
+                        </select>
+                    </div>
+                    <div id="opacity-control">
+                        <label for="opacity-slider">Transparency:</label>
+                        <div id="opacity-container">
+                            <input type="range" id="opacity-slider" min="0" max="100" value="30" />
+                            <span id="opacity-value">70%</span>
+                        </div>
+                    </div>
+                    <div id="feature-layer-toggle">
+                        <label>
+                            <input type="checkbox" id="centroids-toggle" />
+                            Show Centroids (Feature Layer)
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
+        <div id="viewDiv"></div>
         <div id="flood-legend">
             <h3>Flood Intensity</h3>
             <div class="legend-item" data-color="0">

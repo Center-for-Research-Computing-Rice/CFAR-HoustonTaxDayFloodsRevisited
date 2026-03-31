@@ -248,6 +248,9 @@ const view = new MapView({
 
 await view.when();
 
+overlayLayers.historic.visible = true;
+overlayLayers.transposed.visible = false;
+
 const homesHoverPopup = document.getElementById("homes-hover-popup");
 
 function formatDepthFt(value) {
@@ -503,8 +506,7 @@ scenarioButtons.forEach((btn) => {
     });
 });
 
-updateScenarioUI("historic");
-syncCentroidFieldDropdown();
+applyRasterScenario("historic");
 
 function setHomesEnabled(on) {
     overlayLayers.centroids.visible = on;

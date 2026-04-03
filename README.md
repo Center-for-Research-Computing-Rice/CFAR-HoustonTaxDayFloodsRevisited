@@ -4,7 +4,7 @@ A web-based application for visualizing flood information in Houston, Texas usin
 
 ## Overview
 
-This application provides an interactive map interface centered on Houston, Texas, using Leaflet.js mapping library with multiple free basemap options. It displays historic and transposed flood data from ArcGIS tile services without requiring API keys.
+This application provides an interactive map interface centered on Houston, Texas, using Leaflet.js mapping library with multiple free basemap options. It displays historic and transported flood data from ArcGIS tile services without requiring API keys.
 
 ## Features
 
@@ -17,7 +17,7 @@ This application provides an interactive map interface centered on Houston, Texa
   - **USGS Topographic** - Terrain-focused map with contour lines
 - **Flood Data Layers**: Toggle between two visualization layers:
   - **Historic Flood Data** - Historical flood patterns and coverage
-  - **Transposed Flood Data** - Projected or transposed flood scenarios
+  - **Transported Flood Data** - Modeled flood if the Tax Day storm were centered on this area
 - **Interactive Legend**: Displays 6 flood intensity levels with water depth indicators (0-10+ feet)
 - **Address Search**: Search for locations by address and automatically center the map
 - **Home Button**: Quick return button (🏠) to restore original Houston view
@@ -37,7 +37,7 @@ This application provides an interactive map interface centered on Houston, Texa
 2. The map will load automatically centered on Houston (zoom level 12) with CartoDB Positron basemap
 3. Use your mouse to pan and zoom the map
 4. **Basemap Toggle**: Click the dropdown in the top-right panel to switch between 5 different basemaps
-5. **Flood Layer Toggle**: Use the raster selector in the same panel to switch between Historic and Transposed flood data
+5. **Flood Layer Toggle**: Use the raster selector in the same panel to switch between Historic and Transported flood data
 6. **Search Location**: Type an address in the search bar and press Enter to zoom to that location
 7. **Return Home**: Click the 🏠 button above the zoom controls to return to the original Houston view
 8. **Hide Controls**: Click the ⚙️ toggle to collapse the settings panel
@@ -153,10 +153,10 @@ overlayLayers['new-layer'] = L.tileLayer('https://arcgis-url/tile/{z}/{y}/{x}', 
 - Description: Historical flood patterns and affected areas in Houston
 - Displayed at 70% opacity to blend with basemaps
 
-### Transposed Flood Data
+### Transported Flood Data
 - Source: CFAR ArcGIS Server
 - URL: `https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_Clip/MapServer`
-- Description: Projected or transposed flood scenarios
+- Description: Modeled flood depths if the 2016 Tax Day storm were centered on Clear Creek (the hosted MapServer path on ArcGIS is unchanged)
 - Displayed at 70% opacity to blend with basemaps
 
 ## Resources

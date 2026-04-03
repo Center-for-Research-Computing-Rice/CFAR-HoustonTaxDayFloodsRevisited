@@ -4,10 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tax Day Flood Revisited — Clear Creek</title>
-    
-    <!-- ArcGIS JavaScript API v5 -->
-    <link rel="stylesheet" href="https://js.arcgis.com/5.0/esri/themes/light/main.css" />
+
+    <!-- Drop stale service workers on this origin (they often break ArcGIS CDN with opaque FetchEvent responses). Omit if you ship your own PWA. -->
+    <script>
+        (function () {
+            if (!("serviceWorker" in navigator)) return;
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (r) {
+                    r.unregister();
+                });
+            });
+        })();
+    </script>
+
+    <!-- Maps SDK 5 CDN (ESM entry loads core + map components + Calcite). https://developers.arcgis.com/javascript/latest/get-started/ -->
     <script type="module" src="https://js.arcgis.com/5.0/"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/5.0/esri/themes/light/main.css" />
     
     <!-- Local CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -50,7 +62,7 @@
                                 aria-controls="tip-scenario"
                             >?</button>
                             <div id="tip-scenario" class="tip-bubble" role="tooltip">
-                                Pick <strong>Historic</strong> (typical risk here) or <strong>Transposed</strong> (Tax Day 2016 placed on this geography). The flood raster on the map follows your choice.
+                                Pick <strong>Historic</strong> (typical risk here) or <strong>Transported</strong> (Tax Day 2016 placed on this geography). The flood raster on the map follows your choice.
                                 Use <strong>Flood opacity</strong> to fade the raster and see streets underneath. Affected home points follow the same scenario.
                             </div>
                         </span>
@@ -68,11 +80,11 @@
                         <button
                             type="button"
                             class="scenario-btn"
-                            data-scenario="transposed"
+                            data-scenario="transported"
                             aria-pressed="false"
                             title="Depths if the April 2016 Tax Day flood were placed on this landscape."
                         >
-                            <span class="scenario-btn-title">Transposed</span>
+                            <span class="scenario-btn-title">Transported</span>
                         </button>
                     </div>
                     <div id="opacity-control">
@@ -150,7 +162,9 @@
                             </div>
                         </span>
                     </div>
-                    <div id="search-widget-container"></div>
+                    <div id="search-widget-container">
+                        <arcgis-search id="arcgis-search-widget"></arcgis-search>
+                    </div>
                 </section>
 
                 <div id="controls-panel">
@@ -170,7 +184,7 @@
                             <label for="centroid-field-dropdown" title="Usually matches the scenario you picked. Override to color points by the other flood-depth field while keeping the same flood raster.">Point field (advanced)</label>
                             <select id="centroid-field-dropdown">
                                 <option value="TD_histori">Historic</option>
-                                <option value="TD_transpo">Transposed</option>
+                                <option value="TD_transpo">Transported</option>
                             </select>
                         </div>
                     </div>
@@ -179,6 +193,10 @@
         </div>
         <div class="map-view-wrap">
             <div id="viewDiv"></div>
+            <div class="map-embed-widgets map-embed-widgets--top-left" id="map-embed-widgets-tl">
+                <arcgis-home id="arcgis-home-widget"></arcgis-home>
+                <arcgis-zoom id="arcgis-zoom-widget"></arcgis-zoom>
+            </div>
             <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
         </div>
         <div id="flood-legend">

@@ -1,3 +1,7 @@
+/**
+ * Core API via CDN `$arcgis.import()` (supported testing path; production builds often use npm — https://developers.arcgis.com/javascript/latest/get-started-npm/).
+ * Map UI uses `<arcgis-*>` components from the same CDN entry (`<script type="module" src="https://js.arcgis.com/5.0/">` in index.html).
+ */
 const [
     ArcGISMap,
     MapView,
@@ -6,9 +10,8 @@ const [
     WebTileLayer,
     FeatureLayer,
     Basemap,
-    Home,
-    Zoom,
-    Search
+    Viewpoint,
+    reactiveUtils
 ] = await $arcgis.import([
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
@@ -17,9 +20,8 @@ const [
     "@arcgis/core/layers/WebTileLayer.js",
     "@arcgis/core/layers/FeatureLayer.js",
     "@arcgis/core/Basemap.js",
-    "@arcgis/core/widgets/Home.js",
-    "@arcgis/core/widgets/Zoom.js",
-    "@arcgis/core/widgets/Search.js"
+    "@arcgis/core/Viewpoint.js",
+    "@arcgis/core/core/reactiveUtils.js"
 ]);
 
 const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
@@ -27,7 +29,7 @@ const homeZoom = 12;
 const centroidServiceUrl = "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0";
 const historicFloodServiceUrl =
     "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_Clip2/MapServer";
-const transposedFloodServiceUrl =
+const transportedFloodServiceUrl =
     "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_Clip/MapServer";
 
 function getFloodColor(depth) {
@@ -145,8 +147,61 @@ function nearestPaletteDepthForTile(r, g, b) {
     return bestDepth;
 }
 
+/** Plain envelope for intersection tests (avoids fetching tiles the service cannot serve — stops most edge 404 console noise). */
+function envelopeFromLayerExtent(ext) {
+    if (!ext) {
+        return null;
+    }
+    const xmin = ext.xmin;
+    const ymin = ext.ymin;
+    const xmax = ext.xmax;
+    const ymax = ext.ymax;
+    if (![xmin, ymin, xmax, ymax].every(Number.isFinite)) {
+        return null;
+    }
+    return { xmin, ymin, xmax, ymax };
+}
+
+function envelopesIntersect(a, b) {
+    return a.xmin < b.xmax && a.xmax > b.xmin && a.ymin < b.ymax && a.ymax > b.ymin;
+}
+
+function resolutionForTileLevel(tileInfo, level) {
+    const lods = tileInfo?.lods;
+    if (!lods?.length) {
+        return null;
+    }
+    const lod = lods.find((l) => l.level === level);
+    return lod && Number.isFinite(lod.resolution) ? lod.resolution : null;
+}
+
+/**
+ * Esri map-cache envelope: origin at top-left (max y), column east, row south.
+ * Matches /MapServer/tile/{level}/{row}/{col} for standard exported caches.
+ */
+function tileEnvelopeFromRowCol(level, row, col, tileInfo) {
+    const res = resolutionForTileLevel(tileInfo, level);
+    if (res == null) {
+        return null;
+    }
+    const tw = tileInfo.cols ?? tileInfo.rows ?? 256;
+    const th = tileInfo.rows ?? tileInfo.cols ?? 256;
+    const ox = tileInfo.origin?.x;
+    const oy = tileInfo.origin?.y;
+    if (!Number.isFinite(ox) || !Number.isFinite(oy)) {
+        return null;
+    }
+    const dw = res * tw;
+    const dh = res * th;
+    const xmin = ox + col * dw;
+    const xmax = xmin + dw;
+    const ymax = oy - row * dh;
+    const ymin = ymax - dh;
+    return { xmin, ymin, xmax, ymax };
+}
+
 class DepthFilterFloodTileLayer extends BaseTileLayer {
-    constructor({ tileServiceRoot, minDepthFt, spatialReference, fullExtent, tileInfo, ...layerOptions }) {
+    constructor({ tileServiceRoot, minDepthFt, floodScenarioId, spatialReference, fullExtent, tileInfo, ...layerOptions }) {
         super({
             spatialReference,
             fullExtent,
@@ -155,6 +210,16 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         });
         this.tileServiceRoot = tileServiceRoot.replace(/\/$/, "");
         this.minDepthFt = minDepthFt ?? 0;
+        this.floodScenarioId = floodScenarioId;
+        this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
+    }
+
+    getEmptyTileCanvas() {
+        const size = this.tileInfo?.rows || 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        return canvas;
     }
 
     getTileUrl(level, row, col) {
@@ -162,16 +227,35 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
     }
 
     fetchTile(level, row, col, options) {
+        if (this.floodScenarioId !== currentFloodLayer || this.visible === false) {
+            return Promise.resolve(this.getEmptyTileCanvas());
+        }
+
+        const cov = this._coverageEnvelope ?? envelopeFromLayerExtent(this.fullExtent);
+        const tileEnv = tileEnvelopeFromRowCol(level, row, col, this.tileInfo);
+        if (cov && tileEnv && !envelopesIntersect(cov, tileEnv)) {
+            return Promise.resolve(this.getEmptyTileCanvas());
+        }
+
         const url = this.getTileUrl(level, row, col);
         return fetch(url, { signal: options?.signal })
             .then((response) => {
                 if (!response.ok) {
-                    throw new Error(String(response.status));
+                    return null;
                 }
                 return response.blob();
             })
-            .then((blob) => createImageBitmap(blob))
+            .then((blob) => {
+                if (!blob) {
+                    return this.getEmptyTileCanvas();
+                }
+                return createImageBitmap(blob);
+            })
             .then((imageBitmap) => {
+                const isBitmap = imageBitmap && typeof imageBitmap.close === "function" && Number.isFinite(imageBitmap.width);
+                if (!isBitmap) {
+                    return imageBitmap;
+                }
                 const w = imageBitmap.width;
                 const h = imageBitmap.height;
                 const canvas = document.createElement("canvas");
@@ -197,18 +281,20 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                     ctx.putImageData(imageData, 0, 0);
                 }
                 return canvas;
-            });
+            })
+            .catch(() => this.getEmptyTileCanvas());
     }
 }
 
-const [historicFloodMeta, transposedFloodMeta] = await Promise.all([
+const [historicFloodMeta, transportedFloodMeta] = await Promise.all([
     fetch(`${historicFloodServiceUrl}?f=json`).then((r) => r.json()),
-    fetch(`${transposedFloodServiceUrl}?f=json`).then((r) => r.json())
+    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json())
 ]);
 
 const overlayLayers = {
     historic: new DepthFilterFloodTileLayer({
         tileServiceRoot: historicFloodServiceUrl,
+        floodScenarioId: "historic",
         minDepthFt: 0,
         spatialReference: historicFloodMeta.spatialReference,
         fullExtent: historicFloodMeta.fullExtent,
@@ -216,12 +302,13 @@ const overlayLayers = {
         opacity: 0.7,
         visible: true
     }),
-    transposed: new DepthFilterFloodTileLayer({
-        tileServiceRoot: transposedFloodServiceUrl,
+    transported: new DepthFilterFloodTileLayer({
+        tileServiceRoot: transportedFloodServiceUrl,
+        floodScenarioId: "transported",
         minDepthFt: 0,
-        spatialReference: transposedFloodMeta.spatialReference,
-        fullExtent: transposedFloodMeta.fullExtent,
-        tileInfo: transposedFloodMeta.tileInfo,
+        spatialReference: transportedFloodMeta.spatialReference,
+        fullExtent: transportedFloodMeta.fullExtent,
+        tileInfo: transportedFloodMeta.tileInfo,
         opacity: 0.7,
         visible: false
     }),
@@ -230,13 +317,13 @@ const overlayLayers = {
         renderer: createCentroidRenderer(currentCentroidField),
         visible: true,
         popupEnabled: false,
-        outFields: ["OBJECTID", "TD_histori", "TD_transpo"]
+        outFields: ["FID", "TD_histori", "TD_transpo"]
     })
 };
 
 const map = new ArcGISMap({
     basemap: createBasemap("cartodb-positron"),
-    layers: [overlayLayers.historic, overlayLayers.transposed, overlayLayers.centroids]
+    layers: [overlayLayers.historic, overlayLayers.centroids]
 });
 
 const view = new MapView({
@@ -247,9 +334,6 @@ const view = new MapView({
 });
 
 await view.when();
-
-overlayLayers.historic.visible = true;
-overlayLayers.transposed.visible = false;
 
 const homesHoverPopup = document.getElementById("homes-hover-popup");
 
@@ -282,7 +366,7 @@ function getHomesFeatureKey(graphic) {
         }
     }
     const a = graphic.attributes;
-    const oid = a?.OBJECTID ?? a?.FID ?? a?.objectid;
+    const oid = a?.FID ?? a?.OBJECTID ?? a?.objectid;
     if (oid != null) return `oid:${oid}`;
     const g = graphic.geometry;
     if (g && g.type === "point" && Number.isFinite(g.x) && Number.isFinite(g.y)) {
@@ -291,7 +375,7 @@ function getHomesFeatureKey(graphic) {
     return null;
 }
 
-function buildHomesHoverContent(historic, transposed) {
+function buildHomesHoverContent(historic, transportedDepth) {
     return `
         <div class="homes-hover-popup__title">Flood depth</div>
         <div class="homes-hover-popup__row">
@@ -299,8 +383,8 @@ function buildHomesHoverContent(historic, transposed) {
             <span class="homes-hover-popup__value">${formatDepthFt(historic)}</span>
         </div>
         <div class="homes-hover-popup__row">
-            <span class="homes-hover-popup__label">Transposed Flood</span>
-            <span class="homes-hover-popup__value">${formatDepthFt(transposed)}</span>
+            <span class="homes-hover-popup__label">Transported Flood</span>
+            <span class="homes-hover-popup__value">${formatDepthFt(transportedDepth)}</span>
         </div>`;
 }
 
@@ -326,8 +410,8 @@ function positionHomesHoverPopup(screenX, screenY) {
 function showHomesHoverPopup(screenX, screenY, attrs) {
     if (!homesHoverPopup) return;
     const historic = attrs?.TD_histori;
-    const transposed = attrs?.TD_transpo;
-    homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transposed);
+    const transportedDepth = attrs?.TD_transpo;
+    homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transportedDepth);
     homesHoverPopup.hidden = false;
     homesHoverPopup.setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => positionHomesHoverPopup(screenX, screenY));
@@ -418,27 +502,58 @@ view.on("pointer-leave", () => {
 
 view.ui.empty("top-left");
 view.ui.empty("bottom-right");
-view.ui.add(new Home({ view }), "top-left");
-view.ui.add(new Zoom({ view }), "top-left");
 
-const searchWidget = new Search({
-    view,
-    container: "search-widget-container",
-    popupEnabled: true,
-    resultGraphicEnabled: true,
-    allPlaceholder: "Search address or place…",
-    goToOverride: (mapView, goToParams) => {
-        return mapView.goTo(goToParams.target, {
-            ...(goToParams.options || {}),
-            zoom: 15
-        });
+const goToSearchResult = (mapView, goToParams) =>
+    mapView.goTo(goToParams.target, {
+        ...(goToParams.options || {}),
+        zoom: 15
+    });
+
+async function setupMapComponents() {
+    const homeEl = document.getElementById("arcgis-home-widget");
+    const zoomEl = document.getElementById("arcgis-zoom-widget");
+    const searchEl = document.getElementById("arcgis-search-widget");
+
+    await Promise.all(
+        [homeEl, zoomEl, searchEl].map((el) =>
+            el && typeof el.componentOnReady === "function" ? el.componentOnReady() : Promise.resolve()
+        )
+    );
+
+    if (zoomEl) {
+        zoomEl.view = view;
     }
-});
 
-searchWidget.viewModel.location = view.center;
-view.watch("center", () => {
-    searchWidget.viewModel.location = view.center;
-});
+    if (homeEl) {
+        homeEl.view = view;
+        homeEl.viewpoint = view.viewpoint?.clone?.() ?? new Viewpoint({ targetGeometry: view.center, scale: view.scale });
+    }
+
+    if (searchEl) {
+        searchEl.view = view;
+        searchEl.allPlaceholder = "Search address or place…";
+        searchEl.popupDisabled = false;
+        searchEl.resultGraphicDisabled = false;
+        searchEl.goToOverride = goToSearchResult;
+
+        const syncSearchLocation = () => {
+            const vm = searchEl.viewModel;
+            if (vm) {
+                vm.location = view.center;
+            }
+        };
+        syncSearchLocation();
+        if (typeof reactiveUtils.watch === "function") {
+            reactiveUtils.watch(() => view.center, syncSearchLocation);
+        }
+    }
+}
+
+try {
+    await setupMapComponents();
+} catch (err) {
+    console.error("Map components (Home / Zoom / Search) failed to initialize:", err);
+}
 
 const basemapDropdown = document.getElementById("basemap-dropdown");
 const scenarioButtons = document.querySelectorAll(".scenario-btn");
@@ -457,6 +572,38 @@ function syncCentroidFieldDropdown() {
     centroidFieldDropdown.value = currentCentroidField;
 }
 
+function mapLayerIndex(layer) {
+    let i = 0;
+    for (const l of map.layers) {
+        if (l === layer) {
+            return i;
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+/** Only the active scenario’s flood layer is on the map so the SDK cannot request tiles for the other (v5 may load tiles outside our fetchTile guard). */
+function syncActiveFloodLayerOnMap(selectedRaster) {
+    const active = selectedRaster === "historic" ? overlayLayers.historic : overlayLayers.transported;
+    const inactive = selectedRaster === "historic" ? overlayLayers.transported : overlayLayers.historic;
+    const centroids = overlayLayers.centroids;
+
+    if (mapLayerIndex(inactive) !== -1) {
+        map.layers.remove(inactive);
+    }
+
+    const cIdx = mapLayerIndex(centroids);
+    const insertAt = cIdx >= 0 ? cIdx : 0;
+
+    if (mapLayerIndex(active) === -1) {
+        map.layers.add(active, insertAt);
+    }
+
+    active.visible = true;
+    inactive.visible = false;
+}
+
 function updateScenarioUI(selectedRaster) {
     scenarioButtons.forEach((btn) => {
         const isActive = btn.dataset.scenario === selectedRaster;
@@ -467,9 +614,9 @@ function updateScenarioUI(selectedRaster) {
         if (selectedRaster === "historic") {
             scenarioHint.textContent = "Showing: Historic baseline.";
             scenarioHint.title =
-                "Modeled flood depths for typical conditions in this area—the historic baseline. Compare with Transposed to see Tax Day 2016 transposed here.";
+                "Modeled flood depths for typical conditions in this area—the historic baseline. Compare with Transported to see Tax Day 2016 applied here.";
         } else {
-            scenarioHint.textContent = "Showing: Transposed Tax Day 2016.";
+            scenarioHint.textContent = "Showing: Transported Tax Day 2016.";
             scenarioHint.title =
                 "Depths as if the April 2016 Tax Day flood were placed on this landscape. Contrast with Historic to see the difference from typical risk.";
         }
@@ -477,8 +624,9 @@ function updateScenarioUI(selectedRaster) {
 }
 
 function applyRasterScenario(selectedRaster) {
-    overlayLayers.historic.visible = selectedRaster === "historic";
-    overlayLayers.transposed.visible = selectedRaster === "transposed";
+    currentFloodLayer = selectedRaster;
+
+    syncActiveFloodLayerOnMap(selectedRaster);
 
     if (selectedRaster === "historic") {
         currentCentroidField = "TD_histori";
@@ -489,7 +637,6 @@ function applyRasterScenario(selectedRaster) {
     syncCentroidFieldDropdown();
     updateScenarioUI(selectedRaster);
 
-    currentFloodLayer = selectedRaster;
     const homesOn = centroidsToggle.getAttribute("aria-checked") === "true";
     if (homesOn) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
@@ -545,16 +692,19 @@ opacitySlider.addEventListener("input", (event) => {
     const transparency = Number.parseInt(event.target.value, 10);
     const opacity = (100 - transparency) / 100;
     overlayLayers.historic.opacity = opacity;
-    overlayLayers.transposed.opacity = opacity;
+    overlayLayers.transported.opacity = opacity;
     opacityValue.textContent = `${100 - transparency}%`;
 });
 
 function applyFloodMinDepthFt(minFt) {
     const v = Math.max(0, Number(minFt) || 0);
     overlayLayers.historic.minDepthFt = v;
-    overlayLayers.transposed.minDepthFt = v;
-    overlayLayers.historic.refresh();
-    overlayLayers.transposed.refresh();
+    overlayLayers.transported.minDepthFt = v;
+    if (currentFloodLayer === "historic") {
+        overlayLayers.historic.refresh();
+    } else {
+        overlayLayers.transported.refresh();
+    }
 }
 
 if (depthFilterSlider && depthFilterValue) {

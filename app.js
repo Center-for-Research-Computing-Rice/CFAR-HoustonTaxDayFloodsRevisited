@@ -323,7 +323,7 @@ const overlayLayers = {
 
 const map = new ArcGISMap({
     basemap: createBasemap("cartodb-positron"),
-    layers: [overlayLayers.historic, overlayLayers.centroids]
+    layers: [overlayLayers.historic, overlayLayers.transported, overlayLayers.centroids]
 });
 
 const view = new MapView({
@@ -572,38 +572,6 @@ function syncCentroidFieldDropdown() {
     centroidFieldDropdown.value = currentCentroidField;
 }
 
-function mapLayerIndex(layer) {
-    let i = 0;
-    for (const l of map.layers) {
-        if (l === layer) {
-            return i;
-        }
-        i += 1;
-    }
-    return -1;
-}
-
-/** Only the active scenario’s flood layer is on the map so the SDK cannot request tiles for the other (v5 may load tiles outside our fetchTile guard). */
-function syncActiveFloodLayerOnMap(selectedRaster) {
-    const active = selectedRaster === "historic" ? overlayLayers.historic : overlayLayers.transported;
-    const inactive = selectedRaster === "historic" ? overlayLayers.transported : overlayLayers.historic;
-    const centroids = overlayLayers.centroids;
-
-    if (mapLayerIndex(inactive) !== -1) {
-        map.layers.remove(inactive);
-    }
-
-    const cIdx = mapLayerIndex(centroids);
-    const insertAt = cIdx >= 0 ? cIdx : 0;
-
-    if (mapLayerIndex(active) === -1) {
-        map.layers.add(active, insertAt);
-    }
-
-    active.visible = true;
-    inactive.visible = false;
-}
-
 function updateScenarioUI(selectedRaster) {
     scenarioButtons.forEach((btn) => {
         const isActive = btn.dataset.scenario === selectedRaster;
@@ -626,7 +594,8 @@ function updateScenarioUI(selectedRaster) {
 function applyRasterScenario(selectedRaster) {
     currentFloodLayer = selectedRaster;
 
-    syncActiveFloodLayerOnMap(selectedRaster);
+    overlayLayers.historic.visible = selectedRaster === "historic";
+    overlayLayers.transported.visible = selectedRaster === "transported";
 
     if (selectedRaster === "historic") {
         currentCentroidField = "TD_histori";

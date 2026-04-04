@@ -28,18 +28,64 @@ const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
 const homeZoom = 12;
 const centroidServiceUrl = "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0";
 const historicFloodServiceUrl =
-    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_Clip2/MapServer";
+    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_BW/MapServer";
 const transportedFloodServiceUrl =
-    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_Clip/MapServer";
+    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_tif/MapServer";
+
+/** Grayscale tile → feet for filtering / alignment with modeled depths (black = this depth). */
+const FLOOD_RASTER_DATA_MAX_DEPTH_FT = 10;
+
+/** Raster color ramp compresses to this depth; ≥ this depth uses the darkest blue. */
+const FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT = 2;
+
+/**
+ * Normalized t∈[0,1] → RGB; t = min(1, depthFt / FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT).
+ */
+const FLOOD_DEPTH_DISPLAY_STOPS = [
+    { t: 0, r: 204, g: 255, b: 255 },
+    { t: 0.2, r: 102, g: 217, b: 255 },
+    { t: 0.4, r: 0, g: 153, b: 255 },
+    { t: 0.6, r: 0, g: 71, b: 178 },
+    { t: 0.8, r: 0, g: 45, b: 118 },
+    { t: 1, r: 0, g: 14, b: 46 }
+];
+
+function floodDepthDisplayRgbFromNorm(t) {
+    const u = Math.max(0, Math.min(1, t));
+    const stops = FLOOD_DEPTH_DISPLAY_STOPS;
+    if (u <= stops[0].t) {
+        const s = stops[0];
+        return { r: s.r, g: s.g, b: s.b };
+    }
+    const lastStop = stops[stops.length - 1];
+    if (u >= lastStop.t) {
+        return { r: lastStop.r, g: lastStop.g, b: lastStop.b };
+    }
+    for (let i = 0; i < stops.length - 1; i += 1) {
+        const a = stops[i];
+        const b = stops[i + 1];
+        if (u <= b.t) {
+            const span = b.t - a.t || 1e-6;
+            const k = (u - a.t) / span;
+            return {
+                r: Math.round(a.r + k * (b.r - a.r)),
+                g: Math.round(a.g + k * (b.g - a.g)),
+                b: Math.round(a.b + k * (b.b - a.b))
+            };
+        }
+    }
+    return { r: lastStop.r, g: lastStop.g, b: lastStop.b };
+}
 
 function getFloodColor(depth) {
     if (depth === null || depth === undefined) return "#cccccc";
-    if (depth <= 0) return "#ffffff";
-    if (depth <= 2) return "#ccffff";
-    if (depth <= 4) return "#66d9ff";
-    if (depth <= 6) return "#0099ff";
-    if (depth <= 8) return "#0047b2";
-    return "#F523F5";
+    const d = Number(depth);
+    if (!Number.isFinite(d) || d <= 0) return "#ffffff";
+    if (d <= 2) return "#ccffff";
+    if (d <= 4) return "#66d9ff";
+    if (d <= 6) return "#0099ff";
+    if (d <= 8) return "#0047b2";
+    return "#000e2e";
 }
 
 function createBasemap(id) {
@@ -122,58 +168,8 @@ function createCentroidRenderer(fieldName) {
     };
 }
 
-/** Raster legend is a continuous stretch (label “10 - 0”), not the app’s classed sidebar colors. */
-const FLOOD_RASTER_MAX_DEPTH_FT = 10;
-
 /** Reject tile RGB this far from the legend ramp (JPEG / nodata / basemap bleed). */
 const FLOOD_LEGEND_MATCH_MAX_DIST2 = 22000;
-
-/**
- * Samples the MapServer legend PNG (vertical ramp: top = max ft, bottom = 0 ft).
- * Cached tiles use the same stretch symbology as that image.
- */
-async function loadFloodMapServerLegendDepthSamples(mapServerRootUrl) {
-    const base = mapServerRootUrl.replace(/\/$/, "");
-    const url = `${base}/legend?f=json`;
-    try {
-        const json = await fetch(url).then((r) => r.json());
-        const b64 = json?.layers?.[0]?.legend?.[0]?.imageData;
-        if (!b64 || typeof b64 !== "string") {
-            return [];
-        }
-        const binary = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
-        const blob = new Blob([binary], { type: "image/png" });
-        const bmp = await createImageBitmap(blob);
-        const w = bmp.width;
-        const h = bmp.height;
-        if (w < 1 || h < 1) {
-            bmp.close();
-            return [];
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) {
-            bmp.close();
-            return [];
-        }
-        ctx.drawImage(bmp, 0, 0);
-        bmp.close();
-        const cx = Math.floor(w / 2);
-        const column = ctx.getImageData(cx, 0, 1, h).data;
-        const samples = [];
-        const denom = Math.max(1, h - 1);
-        for (let row = 0; row < h; row += 1) {
-            const o = row * 4;
-            const ft = FLOOD_RASTER_MAX_DEPTH_FT * (1 - row / denom);
-            samples.push({ r: column[o], g: column[o + 1], b: column[o + 2], ft });
-        }
-        return samples;
-    } catch {
-        return [];
-    }
-}
 
 /**
  * Depth (ft) from RGB vs legend ramp — O(samples) per pixel (two best matches + small IDW), no sort.
@@ -213,6 +209,38 @@ function estimatedDepthFromLegendSamples(r, g, b, samples) {
     const w1 = 1 / (Math.sqrt(bestD2) + 3);
     const w2 = 1 / (Math.sqrt(secondD2) + 3);
     return (bestFt * w1 + secondFt * w2) / (w1 + w2);
+}
+
+/** BW tiles: white = shallow, black = deep; filter uses data ft, colors use cap at FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT. */
+function processBwFloodTileToBlue(imageData, minDepthFt) {
+    const data = imageData.data;
+    const len = data.length;
+    const minD = Math.max(0, Number(minDepthFt) || 0);
+    const dataMax = FLOOD_RASTER_DATA_MAX_DEPTH_FT;
+    const colorCap = Math.max(1e-6, FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT);
+
+    for (let i = 0; i < len; i += 4) {
+        if (data[i + 3] < 8) {
+            continue;
+        }
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const lum = (r + g + b) / 3;
+        const depthNorm = (255 - lum) / 255;
+        const depthDataFt = depthNorm * dataMax;
+
+        if (minD > 0 && depthDataFt + 1e-6 < minD) {
+            data[i + 3] = 0;
+            continue;
+        }
+
+        const tColor = Math.min(1, depthDataFt / colorCap);
+        const { r: nr, g: ng, b: nb } = floodDepthDisplayRgbFromNorm(tColor);
+        data[i] = nr;
+        data[i + 1] = ng;
+        data[i + 2] = nb;
+    }
 }
 
 /** Plain envelope for intersection tests (avoids fetching tiles the service cannot serve — stops most edge 404 console noise). */
@@ -274,6 +302,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         minDepthFt,
         floodScenarioId,
         legendDepthSamples,
+        tileRgbMode = "legendDepth",
         spatialReference,
         fullExtent,
         tileInfo,
@@ -289,6 +318,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         this.minDepthFt = minDepthFt ?? 0;
         this.floodScenarioId = floodScenarioId;
         this._legendDepthSamples = legendDepthSamples ?? [];
+        this._tileRgbMode = tileRgbMode;
         this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
     }
 
@@ -348,7 +378,11 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                 imageBitmap.close();
                 const minDepth = this.minDepthFt ?? 0;
                 const legend = this._legendDepthSamples;
-                if (minDepth > 0 && legend.length > 0) {
+                if (this._tileRgbMode === "bwBlue") {
+                    const imageData = ctx.getImageData(0, 0, w, h);
+                    processBwFloodTileToBlue(imageData, minDepth);
+                    ctx.putImageData(imageData, 0, 0);
+                } else if (minDepth > 0 && legend.length > 0) {
                     const imageData = ctx.getImageData(0, 0, w, h);
                     const data = imageData.data;
                     const len = data.length;
@@ -369,24 +403,18 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
     }
 }
 
-const [historicFloodMeta, transportedFloodMeta, floodRasterLegendSamples] = await Promise.all([
+const [historicFloodMeta, transportedFloodMeta] = await Promise.all([
     fetch(`${historicFloodServiceUrl}?f=json`).then((r) => r.json()),
-    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json()),
-    loadFloodMapServerLegendDepthSamples(historicFloodServiceUrl)
+    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json())
 ]);
-
-if (!floodRasterLegendSamples.length) {
-    console.warn(
-        "Could not load flood MapServer legend; depth filter on the raster is disabled until legend loads."
-    );
-}
 
 const overlayLayers = {
     historic: new DepthFilterFloodTileLayer({
         tileServiceRoot: historicFloodServiceUrl,
         floodScenarioId: "historic",
         minDepthFt: 0,
-        legendDepthSamples: floodRasterLegendSamples,
+        legendDepthSamples: [],
+        tileRgbMode: "bwBlue",
         spatialReference: historicFloodMeta.spatialReference,
         fullExtent: historicFloodMeta.fullExtent,
         tileInfo: historicFloodMeta.tileInfo,
@@ -397,7 +425,8 @@ const overlayLayers = {
         tileServiceRoot: transportedFloodServiceUrl,
         floodScenarioId: "transported",
         minDepthFt: 0,
-        legendDepthSamples: floodRasterLegendSamples,
+        legendDepthSamples: [],
+        tileRgbMode: "bwBlue",
         spatialReference: transportedFloodMeta.spatialReference,
         fullExtent: transportedFloodMeta.fullExtent,
         tileInfo: transportedFloodMeta.tileInfo,

@@ -97,7 +97,7 @@
                     <div id="depth-filter-control">
                         <label
                             for="depth-filter-slider"
-                            title="Minimum modeled depth kept on the flood map and used for the flooded-home count. Slider label uses &gt; X ft; raster and count use depths ≥ X ft (or &gt; 0 ft when X is 0)."
+                            title="Minimum modeled depth (0–10 ft) kept on the flood raster and used for the flooded-home count. Raster colors use a blue ramp compressed so saturation is reached by ~2 ft modeled depth."
                             >Depth filter</label
                         >
                         <div id="depth-filter-container">
@@ -208,11 +208,11 @@
             <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
         </div>
         <div id="flood-legend">
-            <h3>Flood Depth</h3>
+            <h3>Flood depth</h3>
             <div class="legend-item" data-color="0">
                 <span class="legend-color" style="background-color: #ffffff;"></span>
                 <div class="legend-text">
-                    <span class="legend-label">No Flood</span>
+                    <span class="legend-label">No flood</span>
                     <span class="legend-depth">0 ft</span>
                 </div>
             </div>
@@ -220,35 +220,35 @@
                 <span class="legend-color" style="background-color: #ccffff;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Light</span>
-                    <span class="legend-depth">0-2 ft</span>
+                    <span class="legend-depth">0.1–0.4 ft</span>
                 </div>
             </div>
             <div class="legend-item" data-color="2">
                 <span class="legend-color" style="background-color: #66d9ff;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Moderate</span>
-                    <span class="legend-depth">2-4 ft</span>
+                    <span class="legend-depth">0.41–0.80 ft</span>
                 </div>
             </div>
             <div class="legend-item" data-color="3">
                 <span class="legend-color" style="background-color: #0099ff;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Heavy</span>
-                    <span class="legend-depth">4-6 ft</span>
+                    <span class="legend-depth">0.81–1.20 ft</span>
                 </div>
             </div>
             <div class="legend-item" data-color="4">
                 <span class="legend-color" style="background-color: #0047b2;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Severe</span>
-                    <span class="legend-depth">6-8 ft</span>
+                    <span class="legend-depth">1.21–1.60 ft</span>
                 </div>
             </div>
             <div class="legend-item" data-color="5">
-                <span class="legend-color" style="background-color: #F523F5;"></span>
+                <span class="legend-color" style="background-color: #000e2e;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Extreme</span>
-                    <span class="legend-depth">8-10+ ft</span>
+                    <span class="legend-depth">1.61–2.00 ft</span>
                 </div>
             </div>
         </div>

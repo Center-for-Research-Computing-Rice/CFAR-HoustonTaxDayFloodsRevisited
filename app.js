@@ -887,13 +887,27 @@ centroidFieldDropdown.addEventListener("change", (event) => {
     void refreshFloodedHomesCount();
 });
 
-opacitySlider.addEventListener("input", (event) => {
-    const transparency = Number.parseInt(event.target.value, 10);
+function applyFloodOpacityFromSlider() {
+    if (!opacitySlider || !overlayLayers?.historic || !overlayLayers?.transported) {
+        return;
+    }
+    const transparency = Number.parseInt(opacitySlider.value, 10);
+    if (!Number.isFinite(transparency)) {
+        return;
+    }
     const opacity = (100 - transparency) / 100;
     overlayLayers.historic.opacity = opacity;
     overlayLayers.transported.opacity = opacity;
-    opacityValue.textContent = `${100 - transparency}%`;
-});
+    if (opacityValue) {
+        opacityValue.textContent = `${100 - transparency}%`;
+    }
+}
+
+if (opacitySlider) {
+    opacitySlider.addEventListener("input", () => applyFloodOpacityFromSlider());
+    applyFloodOpacityFromSlider();
+    queueMicrotask(() => applyFloodOpacityFromSlider());
+}
 
 function applyFloodMinDepthFt(minFt) {
     const v = quantizeDepthFilterFt(minFt);

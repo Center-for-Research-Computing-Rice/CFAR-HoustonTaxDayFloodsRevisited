@@ -697,19 +697,22 @@ html, body, #viewDiv {
     display: none;
 }
 
-#basemap-selector {
+#basemap-selector,
+#flood-ramp-selector {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-#basemap-selector label {
+#basemap-selector label,
+#flood-ramp-selector label {
     font-weight: 600;
     color: #333;
     font-size: 12px;
 }
 
-#basemap-dropdown {
+#basemap-dropdown,
+#flood-ramp-dropdown {
     padding: 5px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -719,52 +722,16 @@ html, body, #viewDiv {
     transition: border-color 0.2s;
 }
 
-#basemap-dropdown:hover {
+#basemap-dropdown:hover,
+#flood-ramp-dropdown:hover {
     border-color: #999;
 }
 
-#basemap-dropdown:focus {
+#basemap-dropdown:focus,
+#flood-ramp-dropdown:focus {
     outline: none;
     border-color: #0079c1;
     box-shadow: 0 0 0 3px rgba(0, 121, 193, 0.1);
-}
-
-#centroid-field-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-#centroid-field-selector label {
-    font-weight: 600;
-    color: #333;
-    font-size: 12px;
-}
-
-.advanced-field {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #eee;
-}
-
-#centroid-field-dropdown {
-    padding: 5px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #fff;
-    font-size: 12px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
-
-#centroid-field-dropdown:hover {
-    border-color: #999;
-}
-
-#centroid-field-dropdown:focus {
-    outline: none;
-    border-color: #0099ff;
-    box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
 }
 
 #opacity-control,

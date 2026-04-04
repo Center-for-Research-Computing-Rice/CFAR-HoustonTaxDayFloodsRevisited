@@ -5,7 +5,6 @@
 const [
     ArcGISMap,
     MapView,
-    TileLayer,
     BaseTileLayer,
     WebTileLayer,
     FeatureLayer,
@@ -16,7 +15,6 @@ const [
 ] = await $arcgis.import([
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
-    "@arcgis/core/layers/TileLayer.js",
     "@arcgis/core/layers/BaseTileLayer.js",
     "@arcgis/core/layers/WebTileLayer.js",
     "@arcgis/core/layers/FeatureLayer.js",
@@ -41,20 +39,87 @@ const FLOOD_RASTER_DATA_MAX_DEPTH_FT = 10;
 const FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT = 2;
 
 /**
- * Normalized t∈[0,1] → RGB; t = min(1, depthFt / FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT).
+ * Water-themed display ramps (t = 0 shallow … 1 deep on the compressed color scale).
+ * `classic-cyan` matches the original app palette.
  */
-const FLOOD_DEPTH_DISPLAY_STOPS = [
-    { t: 0, r: 204, g: 255, b: 255 },
-    { t: 0.2, r: 102, g: 217, b: 255 },
-    { t: 0.4, r: 0, g: 153, b: 255 },
-    { t: 0.6, r: 0, g: 71, b: 178 },
-    { t: 0.8, r: 0, g: 45, b: 118 },
-    { t: 1, r: 0, g: 14, b: 46 }
-];
+const FLOOD_RASTER_RAMPS = {
+    "classic-cyan": {
+        label: "Classic cyan–blue",
+        stops: [
+            { t: 0, r: 204, g: 255, b: 255 },
+            { t: 0.2, r: 102, g: 217, b: 255 },
+            { t: 0.4, r: 0, g: 153, b: 255 },
+            { t: 0.6, r: 0, g: 71, b: 178 },
+            { t: 0.8, r: 0, g: 45, b: 118 },
+            { t: 1, r: 0, g: 14, b: 46 }
+        ]
+    },
+    "lagoon-teal": {
+        label: "Lagoon teal",
+        stops: [
+            { t: 0, r: 220, g: 255, b: 252 },
+            { t: 0.2, r: 120, g: 230, b: 215 },
+            { t: 0.4, r: 0, g: 185, b: 175 },
+            { t: 0.6, r: 0, g: 128, b: 135 },
+            { t: 0.8, r: 0, g: 88, b: 100 },
+            { t: 1, r: 0, g: 48, b: 62 }
+        ]
+    },
+    "deep-navy": {
+        label: "Deep navy",
+        stops: [
+            { t: 0, r: 232, g: 240, b: 255 },
+            { t: 0.2, r: 170, g: 195, b: 230 },
+            { t: 0.4, r: 95, g: 135, b: 195 },
+            { t: 0.6, r: 45, g: 85, b: 150 },
+            { t: 0.8, r: 22, g: 50, b: 105 },
+            { t: 1, r: 10, g: 24, b: 58 }
+        ]
+    },
+    "tropical-azure": {
+        label: "Tropical azure",
+        stops: [
+            { t: 0, r: 200, g: 248, b: 255 },
+            { t: 0.2, r: 0, g: 220, b: 255 },
+            { t: 0.4, r: 0, g: 175, b: 235 },
+            { t: 0.6, r: 0, g: 120, b: 200 },
+            { t: 0.8, r: 0, g: 75, b: 150 },
+            { t: 1, r: 0, g: 38, b: 88 }
+        ]
+    },
+    "slate-tide": {
+        label: "Slate tide",
+        stops: [
+            { t: 0, r: 235, g: 242, b: 248 },
+            { t: 0.2, r: 185, g: 205, b: 225 },
+            { t: 0.4, r: 110, g: 145, b: 180 },
+            { t: 0.6, r: 60, g: 100, b: 140 },
+            { t: 0.8, r: 35, g: 68, b: 98 },
+            { t: 1, r: 18, g: 38, b: 58 }
+        ]
+    },
+    "seafoam-mist": {
+        label: "Seafoam mist",
+        stops: [
+            { t: 0, r: 230, g: 255, b: 248 },
+            { t: 0.2, r: 160, g: 240, b: 225 },
+            { t: 0.4, r: 70, g: 200, b: 195 },
+            { t: 0.6, r: 30, g: 150, b: 165 },
+            { t: 0.8, r: 15, g: 105, b: 130 },
+            { t: 1, r: 8, g: 62, b: 82 }
+        ]
+    }
+};
 
-function floodDepthDisplayRgbFromNorm(t) {
+let currentFloodRasterRampId = "classic-cyan";
+
+function getFloodRasterDisplayStops() {
+    const ramp = FLOOD_RASTER_RAMPS[currentFloodRasterRampId];
+    return ramp?.stops ?? FLOOD_RASTER_RAMPS["classic-cyan"].stops;
+}
+
+function floodDepthDisplayRgbFromNorm(t, stops = getFloodRasterDisplayStops()) {
     const u = Math.max(0, Math.min(1, t));
-    const stops = FLOOD_DEPTH_DISPLAY_STOPS;
     if (u <= stops[0].t) {
         const s = stops[0];
         return { r: s.r, g: s.g, b: s.b };
@@ -90,44 +155,36 @@ function getFloodColor(depth) {
     return "#000e2e";
 }
 
-function createBasemap(id) {
-    if (id === "osm") {
-        return new Basemap({
-            baseLayers: [new WebTileLayer({ urlTemplate: "https://{subDomain}.tile.openstreetmap.org/{level}/{col}/{row}.png", subDomains: ["a", "b", "c"] })],
-            title: "OpenStreetMap",
-            id: "osm"
-        });
-    }
+/** Esri portal basemap ids accepted by `map.basemap` (vector / imagery presets). */
+const ESRI_BASEMAP_BY_SELECTOR = {
+    "esri-streets": "streets-vector",
+    "esri-satellite": "satellite",
+    "esri-hybrid": "hybrid",
+    "esri-topo": "topo-vector",
+    "esri-light-gray": "gray-vector",
+    "esri-dark-gray": "dark-gray-vector",
+    "esri-terrain": "terrain",
+    "esri-oceans": "oceans"
+};
 
+function createBasemap(id) {
     if (id === "cartodb-positron") {
         return new Basemap({
-            baseLayers: [new WebTileLayer({ urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/light_all/{level}/{col}/{row}.png", subDomains: ["a", "b", "c", "d"] })],
+            baseLayers: [
+                new WebTileLayer({
+                    urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/light_all/{level}/{col}/{row}.png",
+                    subDomains: ["a", "b", "c", "d"]
+                })
+            ],
             title: "CartoDB Positron",
             id: "cartodb-positron"
         });
     }
-
-    if (id === "cartodb-voyager") {
-        return new Basemap({
-            baseLayers: [new WebTileLayer({ urlTemplate: "https://{subDomain}.basemaps.cartocdn.com/rastertiles/voyager/{level}/{col}/{row}.png", subDomains: ["a", "b", "c", "d"] })],
-            title: "CartoDB Voyager",
-            id: "cartodb-voyager"
-        });
+    const esriId = ESRI_BASEMAP_BY_SELECTOR[id];
+    if (esriId != null) {
+        return esriId;
     }
-
-    if (id === "esri-aerial") {
-        return "satellite";
-    }
-
-    if (id === "usgs-topo") {
-        return new Basemap({
-            baseLayers: [new TileLayer({ url: "https://services.arcgisonline.com/arcgis/rest/services/USA_Topo_Maps/MapServer" })],
-            title: "USGS Topographic",
-            id: "usgs-topo"
-        });
-    }
-
-    return "streets-vector";
+    return createBasemap("cartodb-positron");
 }
 
 let currentCentroidField = "TD_histori";
@@ -220,6 +277,7 @@ function processBwFloodTileToBlue(imageData, minDepthFt) {
     const minD = Math.max(0, Number(minDepthFt) || 0);
     const dataMax = FLOOD_RASTER_DATA_MAX_DEPTH_FT;
     const colorCap = Math.max(1e-6, FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT);
+    const stops = getFloodRasterDisplayStops();
 
     for (let i = 0; i < len; i += 4) {
         if (data[i + 3] < 8) {
@@ -238,7 +296,7 @@ function processBwFloodTileToBlue(imageData, minDepthFt) {
         }
 
         const tColor = Math.min(1, depthDataFt / colorCap);
-        const { r: nr, g: ng, b: nb } = floodDepthDisplayRgbFromNorm(tColor);
+        const { r: nr, g: ng, b: nb } = floodDepthDisplayRgbFromNorm(tColor, stops);
         data[i] = nr;
         data[i + 1] = ng;
         data[i + 2] = nb;
@@ -686,23 +744,19 @@ try {
 }
 
 const basemapDropdown = document.getElementById("basemap-dropdown");
+const floodRampDropdown = document.getElementById("flood-ramp-dropdown");
 const scenarioButtons = document.querySelectorAll(".scenario-btn");
 const scenarioHint = document.getElementById("scenario-hint");
 const centroidsToggle = document.getElementById("centroids-toggle");
 const homesPointLegend = document.getElementById("homes-point-legend");
 const homesFloodedStat = document.getElementById("homes-flooded-stat");
 const homesFloodedCountEl = document.getElementById("homes-flooded-count");
-const centroidFieldDropdown = document.getElementById("centroid-field-dropdown");
 const opacitySlider = document.getElementById("opacity-slider");
 const opacityValue = document.getElementById("opacity-value");
 const depthFilterSlider = document.getElementById("depth-filter-slider");
 const depthFilterValue = document.getElementById("depth-filter-value");
 const controlsToggle = document.getElementById("controls-toggle");
 const controlsContent = document.getElementById("controls-content");
-
-function syncCentroidFieldDropdown() {
-    centroidFieldDropdown.value = currentCentroidField;
-}
 
 /** Depth filter UI / raster / query use 0.1 ft steps (avoids range float noise). */
 function quantizeDepthFilterFt(x) {
@@ -822,7 +876,6 @@ function applyRasterScenario(selectedRaster) {
         currentCentroidField = "TD_transpo";
     }
 
-    syncCentroidFieldDropdown();
     updateScenarioUI(selectedRaster);
 
     const homesOn = centroidsToggle.getAttribute("aria-checked") === "true";
@@ -833,9 +886,32 @@ function applyRasterScenario(selectedRaster) {
     void refreshFloodedHomesCount();
 }
 
+function refreshFloodRasterTiles() {
+    overlayLayers?.historic?.refresh?.();
+    overlayLayers?.transported?.refresh?.();
+}
+
+function applyFloodRasterRamp(rampId) {
+    if (!FLOOD_RASTER_RAMPS[rampId]) {
+        return;
+    }
+    currentFloodRasterRampId = rampId;
+    if (floodRampDropdown) {
+        floodRampDropdown.value = rampId;
+    }
+    refreshFloodRasterTiles();
+}
+
 basemapDropdown.addEventListener("change", (event) => {
     map.basemap = createBasemap(event.target.value);
 });
+
+if (floodRampDropdown) {
+    floodRampDropdown.addEventListener("change", (event) => {
+        applyFloodRasterRamp(event.target.value);
+    });
+    floodRampDropdown.value = currentFloodRasterRampId;
+}
 
 scenarioButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -877,15 +953,6 @@ centroidsToggle.addEventListener("click", () => {
 });
 
 setHomesEnabled(true);
-
-centroidFieldDropdown.addEventListener("change", (event) => {
-    currentCentroidField = event.target.value;
-    if (centroidsToggle.getAttribute("aria-checked") === "true") {
-        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
-    }
-    syncCentroidsLayerViewFilter();
-    void refreshFloodedHomesCount();
-});
 
 function applyFloodOpacityFromSlider() {
     if (!opacitySlider || !overlayLayers?.historic || !overlayLayers?.transported) {

@@ -182,17 +182,25 @@
                             <label for="basemap-dropdown">Basemap</label>
                             <select id="basemap-dropdown">
                                 <option value="cartodb-positron">CartoDB Positron</option>
-                                <option value="osm">OpenStreetMap</option>
-                                <option value="cartodb-voyager">CartoDB Voyager</option>
-                                <option value="esri-aerial">Satellite</option>
-                                <option value="usgs-topo">USGS Topographic</option>
+                                <option value="esri-streets">Streets (Esri)</option>
+                                <option value="esri-satellite">Satellite (Esri)</option>
+                                <option value="esri-hybrid">Hybrid (Esri)</option>
+                                <option value="esri-topo">Topographic (Esri)</option>
+                                <option value="esri-light-gray">Light gray canvas (Esri)</option>
+                                <option value="esri-dark-gray">Dark gray canvas (Esri)</option>
+                                <option value="esri-terrain">Terrain (Esri)</option>
+                                <option value="esri-oceans">Oceans (Esri)</option>
                             </select>
                         </div>
-                        <div id="centroid-field-selector" class="advanced-field">
-                            <label for="centroid-field-dropdown" title="Usually matches the scenario you picked. Override to color points by the other flood-depth field while keeping the same flood raster.">Point field (advanced)</label>
-                            <select id="centroid-field-dropdown">
-                                <option value="TD_histori">Historic</option>
-                                <option value="TD_transpo">Transported</option>
+                        <div id="flood-ramp-selector">
+                            <label for="flood-ramp-dropdown">Flood color ramp</label>
+                            <select id="flood-ramp-dropdown" title="Water-themed depth colors for the flood raster (both scenarios).">
+                                <option value="classic-cyan">Classic cyan–blue (default)</option>
+                                <option value="lagoon-teal">Lagoon teal</option>
+                                <option value="deep-navy">Deep navy</option>
+                                <option value="tropical-azure">Tropical azure</option>
+                                <option value="slate-tide">Slate tide</option>
+                                <option value="seafoam-mist">Seafoam mist</option>
                             </select>
                         </div>
                     </div>

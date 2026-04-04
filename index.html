@@ -208,47 +208,76 @@
             <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
         </div>
         <div id="flood-legend">
-            <h3>Flood depth</h3>
-            <div class="legend-item" data-color="0">
+            <div class="flood-legend-header">
+                <h3>Flood depth</h3>
+                <span class="tip-wrap tip-wrap--click-only tip-wrap--wide tip-wrap--map-bounded">
+                    <button
+                        type="button"
+                        class="tip-trigger"
+                        id="tip-btn-flood-legend"
+                        aria-label="Help: flood depth legend classes"
+                        aria-expanded="false"
+                        aria-controls="tip-flood-legend"
+                    >?</button>
+                    <div id="tip-flood-legend" class="tip-bubble tip-bubble--long" role="tooltip">
+                        <div class="tip-flood-legend-body">
+                            <p>
+                                <strong>0.0 ft — None.</strong>
+                                No flooding.
+                            </p>
+                            <p>
+                                <strong>0.1–0.4 ft — Nuisance.</strong>
+                                Flooding, but considered more of a nuisance than an emergency.
+                            </p>
+                            <p>
+                                <strong>0.5–1.0 ft — Danger.</strong>
+                                In the world of emergency management, 6 inches is considered the danger zone. On the road, it can reach the bottom of most cars, cause hydroplaning even at low speeds, compromise braking capabilities, and obscure hidden hazards such as missing manhole covers dislodged by sudden water flow. At home, it can submerge carpets and other flooring and soak drywall, which acts like a paper towel to suck water upward an additional 1 to 2 feet, often requiring a total tear-out. Water typically reaches the floor joists or crawlspace of elevated homes. In non-elevated homes, it marks the inundation of basements and the threshold for nuisance flooding (Moftakhari et al., 2018).
+                            </p>
+                            <p>
+                                <strong>1.1–2.0 ft — Major.</strong>
+                                At 1 foot, flooding often reaches the average interior floor height for modern residential construction (Al Assi et al., 2024). Once water exceeds this level, damage shifts from “external/seepage” to “internal/structural,” requiring significant remediation of drywall and flooring. On the road, flooding at or above 1 foot is recognized as the operational failure limit where water reaches the exhaust and air intakes of most standard sedans, leading to total mechanical failure (Pregnolato et al., 2017; Shah et al., 2018).
+                            </p>
+                            <p>
+                                <strong>2+ ft — Extreme.</strong>
+                                At 2 feet, even large SUVs and trucks begin to lose tire friction and float, making them susceptible to being swept away (Dworkin, 2007; Shah et al., 2018). At home, flooding above 2 foot is defined as Extreme Hazard level. Hydrostatic pressure on walls can cause structural collapse if the water is not balanced internally (NBS, 2025). Residential and utility sectors (like power and sewage) also often experience system-wide failure (Wang et al., 2026).
+                            </p>
+                        </div>
+                    </div>
+                </span>
+            </div>
+            <div class="legend-item" data-depth-class="none">
                 <span class="legend-color" style="background-color: #ffffff;"></span>
                 <div class="legend-text">
-                    <span class="legend-label">No flood</span>
-                    <span class="legend-depth">0 ft</span>
+                    <span class="legend-label">None</span>
+                    <span class="legend-depth">0.0 ft</span>
                 </div>
             </div>
-            <div class="legend-item" data-color="1">
+            <div class="legend-item" data-depth-class="nuisance">
                 <span class="legend-color" style="background-color: #ccffff;"></span>
                 <div class="legend-text">
-                    <span class="legend-label">Light</span>
+                    <span class="legend-label">Nuisance</span>
                     <span class="legend-depth">0.1–0.4 ft</span>
                 </div>
             </div>
-            <div class="legend-item" data-color="2">
+            <div class="legend-item" data-depth-class="danger">
                 <span class="legend-color" style="background-color: #66d9ff;"></span>
                 <div class="legend-text">
-                    <span class="legend-label">Moderate</span>
-                    <span class="legend-depth">0.41–0.80 ft</span>
+                    <span class="legend-label">Danger</span>
+                    <span class="legend-depth">0.5–1.0 ft</span>
                 </div>
             </div>
-            <div class="legend-item" data-color="3">
+            <div class="legend-item" data-depth-class="major">
                 <span class="legend-color" style="background-color: #0099ff;"></span>
                 <div class="legend-text">
-                    <span class="legend-label">Heavy</span>
-                    <span class="legend-depth">0.81–1.20 ft</span>
+                    <span class="legend-label">Major</span>
+                    <span class="legend-depth">1.1–2.0 ft</span>
                 </div>
             </div>
-            <div class="legend-item" data-color="4">
-                <span class="legend-color" style="background-color: #0047b2;"></span>
-                <div class="legend-text">
-                    <span class="legend-label">Severe</span>
-                    <span class="legend-depth">1.21–1.60 ft</span>
-                </div>
-            </div>
-            <div class="legend-item" data-color="5">
+            <div class="legend-item" data-depth-class="extreme">
                 <span class="legend-color" style="background-color: #000e2e;"></span>
                 <div class="legend-text">
                     <span class="legend-label">Extreme</span>
-                    <span class="legend-depth">1.61–2.00 ft</span>
+                    <span class="legend-depth">2+ ft</span>
                 </div>
             </div>
         </div>

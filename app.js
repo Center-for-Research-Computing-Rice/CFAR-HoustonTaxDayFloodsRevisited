@@ -571,8 +571,8 @@ async function runHomesHoverHitTest(event) {
         if (!overlayLayers.centroids.visible) {
             view.container.style.cursor = "";
             hideHomesHoverPopup();
-            return;
-        }
+                return;
+            }
         const hit = response.results.find((r) => r.graphic?.layer === overlayLayers.centroids);
         if (hit?.graphic) {
             view.container.style.cursor = "pointer";
@@ -896,20 +896,58 @@ function positionTipBubble(wrap) {
     }
     const br = btn.getBoundingClientRect();
     const margin = 8;
-    const maxW = 252;
-    const w = Math.min(maxW, window.innerWidth - 2 * margin);
-    let left = br.right - w;
-    left = Math.max(margin, Math.min(left, window.innerWidth - margin - w));
     const gap = 6;
-    let top = br.bottom + gap;
+    const mapWrap = document.querySelector(".map-view-wrap");
+    const boundToMap = wrap.classList.contains("tip-wrap--map-bounded");
+
+    let maxW = wrap.classList.contains("tip-wrap--wide") ? 380 : 252;
+    if (boundToMap && mapWrap) {
+        const mr = mapWrap.getBoundingClientRect();
+        maxW = Math.min(maxW, Math.max(160, mr.width - 2 * margin));
+    }
+    const w = Math.min(maxW, window.innerWidth - 2 * margin);
+
+    let minLeft = margin;
+    let maxLeft = window.innerWidth - margin - w;
+    let minTop = margin;
+    let maxBottom = window.innerHeight - margin;
+
+    if (boundToMap && mapWrap) {
+        const mr = mapWrap.getBoundingClientRect();
+        minLeft = mr.left + margin;
+        maxLeft = mr.right - margin - w;
+        minTop = mr.top + margin;
+        maxBottom = mr.bottom - margin;
+    }
+
+    if (maxLeft < minLeft) {
+        maxLeft = minLeft;
+    }
+
+    let left = br.right - w;
+    left = Math.max(minLeft, Math.min(left, maxLeft));
+
     bubble.style.width = `${w}px`;
+    if (boundToMap) {
+        const vertAvail = Math.max(120, maxBottom - minTop - gap);
+        bubble.style.maxHeight = `${Math.min(560, vertAvail)}px`;
+    } else {
+        bubble.style.maxHeight = "";
+    }
+
+    let top = br.bottom + gap;
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
-    const h = bubble.offsetHeight;
-    if (top + h > window.innerHeight - margin) {
-        top = Math.max(margin, br.top - h - gap);
-        bubble.style.top = `${top}px`;
+    let h = bubble.offsetHeight;
+
+    if (top + h > maxBottom) {
+        top = br.top - h - gap;
     }
+    top = Math.max(minTop, Math.min(top, maxBottom - h));
+    if (top < minTop) {
+        top = minTop;
+    }
+    bubble.style.top = `${top}px`;
 }
 
 function repositionVisibleTips() {

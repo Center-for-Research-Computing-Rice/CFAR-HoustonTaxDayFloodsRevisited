@@ -878,20 +878,60 @@ html, body, #viewDiv {
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
-    pointer-events: none;
+    pointer-events: auto;
+}
+
+#flood-legend .flood-legend-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 0 2px;
+    padding: 0 0 8px;
+    border-bottom: 2px solid #c45c26;
 }
 
 #flood-legend h3 {
     font-size: 12px;
-    margin: 0 0 2px;
-    padding: 0 0 8px;
+    margin: 0;
+    padding: 0;
     color: #2c2820;
     font-weight: 700;
     letter-spacing: 0.02em;
     text-transform: none;
     text-align: center;
-    border-right: none;
-    border-bottom: 2px solid #c45c26;
+    border: none;
+}
+
+/* Flood legend help: open only via click, not hover */
+.tip-wrap.tip-wrap--click-only:hover .tip-bubble,
+.tip-wrap.tip-wrap--click-only:focus-within .tip-bubble {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-3px);
+}
+
+.tip-wrap.tip-wrap--click-only.has-open-tip .tip-bubble {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.tip-bubble.tip-bubble--long {
+    max-height: min(72vh, 560px);
+}
+
+.tip-flood-legend-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tip-flood-legend-body p {
+    margin: 0;
 }
 
 .legend-item {

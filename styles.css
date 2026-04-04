@@ -486,6 +486,37 @@ html, body, #viewDiv {
     line-height: 1.2;
 }
 
+.homes-flooded-stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e8e4dc;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #454038;
+}
+
+.homes-flooded-stat__label {
+    font-weight: 600;
+    color: #2c2820;
+}
+
+.homes-flooded-stat__value {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #c45c26;
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.homes-flooded-stat__value--pending {
+    color: #9a948a;
+    opacity: 0.55;
+}
+
 .homes-visibility-switch {
     position: relative;
     box-sizing: border-box;

@@ -95,10 +95,14 @@
                         </div>
                     </div>
                     <div id="depth-filter-control">
-                        <label for="depth-filter-slider">Depth filter</label>
+                        <label
+                            for="depth-filter-slider"
+                            title="Minimum modeled depth kept on the flood map and used for the flooded-home count. Slider label uses &gt; X ft; raster and count use depths ≥ X ft (or &gt; 0 ft when X is 0)."
+                            >Depth filter</label
+                        >
                         <div id="depth-filter-container">
                             <input type="range" id="depth-filter-slider" min="0" max="10" step="0.5" value="0" />
-                            <span id="depth-filter-value">0 ft</span>
+                            <span id="depth-filter-value">Any depth</span>
                         </div>
                     </div>
                     <p id="scenario-hint" class="scenario-hint scenario-hint--compact" role="status"></p>
@@ -141,6 +145,10 @@
                                 <span class="homes-legend-swatch homes-legend-swatch--not-flooded" aria-hidden="true"></span>
                                 <span class="homes-legend-label">Not flooded</span>
                             </div>
+                        </div>
+                        <div id="homes-flooded-stat" class="homes-flooded-stat" aria-live="polite">
+                            <span class="homes-flooded-stat__label">Flooded homes</span>
+                            <span id="homes-flooded-count" class="homes-flooded-stat__value">—</span>
                         </div>
                     </div>
                 </section>

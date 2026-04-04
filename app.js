@@ -122,29 +122,97 @@ function createCentroidRenderer(fieldName) {
     };
 }
 
-const FLOOD_TILE_PALETTE = [
-    { r: 255, g: 255, b: 255, depth: 0 },
-    { r: 204, g: 255, b: 255, depth: 1 },
-    { r: 102, g: 217, b: 255, depth: 3 },
-    { r: 0, g: 153, b: 255, depth: 5 },
-    { r: 0, g: 71, b: 178, depth: 7 },
-    { r: 245, g: 35, b: 245, depth: 9 }
-];
+/** Raster legend is a continuous stretch (label “10 - 0”), not the app’s classed sidebar colors. */
+const FLOOD_RASTER_MAX_DEPTH_FT = 10;
 
-const FLOOD_TILE_PALETTE_MAX_DIST2 = 11000;
+/** Reject tile RGB this far from the legend ramp (JPEG / nodata / basemap bleed). */
+const FLOOD_LEGEND_MATCH_MAX_DIST2 = 22000;
 
-function nearestPaletteDepthForTile(r, g, b) {
-    let bestDepth = 0;
-    let bestDist = Infinity;
-    for (const p of FLOOD_TILE_PALETTE) {
-        const d = (r - p.r) ** 2 + (g - p.g) ** 2 + (b - p.b) ** 2;
-        if (d < bestDist) {
-            bestDist = d;
-            bestDepth = p.depth;
+/**
+ * Samples the MapServer legend PNG (vertical ramp: top = max ft, bottom = 0 ft).
+ * Cached tiles use the same stretch symbology as that image.
+ */
+async function loadFloodMapServerLegendDepthSamples(mapServerRootUrl) {
+    const base = mapServerRootUrl.replace(/\/$/, "");
+    const url = `${base}/legend?f=json`;
+    try {
+        const json = await fetch(url).then((r) => r.json());
+        const b64 = json?.layers?.[0]?.legend?.[0]?.imageData;
+        if (!b64 || typeof b64 !== "string") {
+            return [];
+        }
+        const binary = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+        const blob = new Blob([binary], { type: "image/png" });
+        const bmp = await createImageBitmap(blob);
+        const w = bmp.width;
+        const h = bmp.height;
+        if (w < 1 || h < 1) {
+            bmp.close();
+            return [];
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+            bmp.close();
+            return [];
+        }
+        ctx.drawImage(bmp, 0, 0);
+        bmp.close();
+        const cx = Math.floor(w / 2);
+        const column = ctx.getImageData(cx, 0, 1, h).data;
+        const samples = [];
+        const denom = Math.max(1, h - 1);
+        for (let row = 0; row < h; row += 1) {
+            const o = row * 4;
+            const ft = FLOOD_RASTER_MAX_DEPTH_FT * (1 - row / denom);
+            samples.push({ r: column[o], g: column[o + 1], b: column[o + 2], ft });
+        }
+        return samples;
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Depth (ft) from RGB vs legend ramp — O(samples) per pixel (two best matches + small IDW), no sort.
+ * Previous version sorted 60 entries per pixel × 65k pixels/tile → major jank.
+ */
+function estimatedDepthFromLegendSamples(r, g, b, samples) {
+    const n = samples.length;
+    if (n === 0) {
+        return 0;
+    }
+    let bestD2 = Infinity;
+    let bestFt = 0;
+    let secondD2 = Infinity;
+    let secondFt = 0;
+    for (let i = 0; i < n; i += 1) {
+        const s = samples[i];
+        const dr = r - s.r;
+        const dg = g - s.g;
+        const db = b - s.b;
+        const d2 = dr * dr + dg * dg + db * db;
+        if (d2 < bestD2) {
+            secondD2 = bestD2;
+            secondFt = bestFt;
+            bestD2 = d2;
+            bestFt = s.ft;
+        } else if (d2 < secondD2) {
+            secondD2 = d2;
+            secondFt = s.ft;
         }
     }
-    if (bestDist > FLOOD_TILE_PALETTE_MAX_DIST2) return 0;
-    return bestDepth;
+    if (bestD2 > FLOOD_LEGEND_MATCH_MAX_DIST2) {
+        return 0;
+    }
+    if (secondD2 === Infinity || secondD2 > FLOOD_LEGEND_MATCH_MAX_DIST2) {
+        return bestFt;
+    }
+    const w1 = 1 / (Math.sqrt(bestD2) + 3);
+    const w2 = 1 / (Math.sqrt(secondD2) + 3);
+    return (bestFt * w1 + secondFt * w2) / (w1 + w2);
 }
 
 /** Plain envelope for intersection tests (avoids fetching tiles the service cannot serve — stops most edge 404 console noise). */
@@ -201,7 +269,16 @@ function tileEnvelopeFromRowCol(level, row, col, tileInfo) {
 }
 
 class DepthFilterFloodTileLayer extends BaseTileLayer {
-    constructor({ tileServiceRoot, minDepthFt, floodScenarioId, spatialReference, fullExtent, tileInfo, ...layerOptions }) {
+    constructor({
+        tileServiceRoot,
+        minDepthFt,
+        floodScenarioId,
+        legendDepthSamples,
+        spatialReference,
+        fullExtent,
+        tileInfo,
+        ...layerOptions
+    }) {
         super({
             spatialReference,
             fullExtent,
@@ -211,6 +288,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         this.tileServiceRoot = tileServiceRoot.replace(/\/$/, "");
         this.minDepthFt = minDepthFt ?? 0;
         this.floodScenarioId = floodScenarioId;
+        this._legendDepthSamples = legendDepthSamples ?? [];
         this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
     }
 
@@ -261,7 +339,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                 const canvas = document.createElement("canvas");
                 canvas.width = w;
                 canvas.height = h;
-                const ctx = canvas.getContext("2d");
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
                 if (!ctx) {
                     imageBitmap.close();
                     throw new Error("Canvas 2D unavailable");
@@ -269,11 +347,16 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                 ctx.drawImage(imageBitmap, 0, 0);
                 imageBitmap.close();
                 const minDepth = this.minDepthFt ?? 0;
-                if (minDepth > 0) {
+                const legend = this._legendDepthSamples;
+                if (minDepth > 0 && legend.length > 0) {
                     const imageData = ctx.getImageData(0, 0, w, h);
                     const data = imageData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        const est = nearestPaletteDepthForTile(data[i], data[i + 1], data[i + 2]);
+                    const len = data.length;
+                    for (let i = 0; i < len; i += 4) {
+                        if (data[i + 3] < 8) {
+                            continue;
+                        }
+                        const est = estimatedDepthFromLegendSamples(data[i], data[i + 1], data[i + 2], legend);
                         if (est + 1e-6 < minDepth) {
                             data[i + 3] = 0;
                         }
@@ -286,16 +369,24 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
     }
 }
 
-const [historicFloodMeta, transportedFloodMeta] = await Promise.all([
+const [historicFloodMeta, transportedFloodMeta, floodRasterLegendSamples] = await Promise.all([
     fetch(`${historicFloodServiceUrl}?f=json`).then((r) => r.json()),
-    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json())
+    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json()),
+    loadFloodMapServerLegendDepthSamples(historicFloodServiceUrl)
 ]);
+
+if (!floodRasterLegendSamples.length) {
+    console.warn(
+        "Could not load flood MapServer legend; depth filter on the raster is disabled until legend loads."
+    );
+}
 
 const overlayLayers = {
     historic: new DepthFilterFloodTileLayer({
         tileServiceRoot: historicFloodServiceUrl,
         floodScenarioId: "historic",
         minDepthFt: 0,
+        legendDepthSamples: floodRasterLegendSamples,
         spatialReference: historicFloodMeta.spatialReference,
         fullExtent: historicFloodMeta.fullExtent,
         tileInfo: historicFloodMeta.tileInfo,
@@ -306,6 +397,7 @@ const overlayLayers = {
         tileServiceRoot: transportedFloodServiceUrl,
         floodScenarioId: "transported",
         minDepthFt: 0,
+        legendDepthSamples: floodRasterLegendSamples,
         spatialReference: transportedFloodMeta.spatialReference,
         fullExtent: transportedFloodMeta.fullExtent,
         tileInfo: transportedFloodMeta.tileInfo,
@@ -341,7 +433,7 @@ function formatDepthFt(value) {
     if (value === null || value === undefined || value === "") return "—";
     const n = Number(value);
     if (Number.isNaN(n)) return "—";
-    if (n === -9999) return "No Data";
+    if (n === -9999) return "0 ft";
     return `${n.toFixed(1)} ft`;
 }
 
@@ -560,6 +652,8 @@ const scenarioButtons = document.querySelectorAll(".scenario-btn");
 const scenarioHint = document.getElementById("scenario-hint");
 const centroidsToggle = document.getElementById("centroids-toggle");
 const homesPointLegend = document.getElementById("homes-point-legend");
+const homesFloodedStat = document.getElementById("homes-flooded-stat");
+const homesFloodedCountEl = document.getElementById("homes-flooded-count");
 const centroidFieldDropdown = document.getElementById("centroid-field-dropdown");
 const opacitySlider = document.getElementById("opacity-slider");
 const opacityValue = document.getElementById("opacity-value");
@@ -570,6 +664,71 @@ const controlsContent = document.getElementById("controls-content");
 
 function syncCentroidFieldDropdown() {
     centroidFieldDropdown.value = currentCentroidField;
+}
+
+function getFloodMinDepthFt() {
+    return Math.max(0, Number(overlayLayers?.historic?.minDepthFt) || 0);
+}
+
+function formatDepthFilterReadout(minFt) {
+    const v = Math.max(0, Number(minFt) || 0);
+    if (v <= 0) {
+        return "Any depth";
+    }
+    return `> ${v.toFixed(1)} ft`;
+}
+
+function syncDepthFilterReadout(minFt) {
+    if (depthFilterValue) {
+        depthFilterValue.textContent = formatDepthFilterReadout(minFt);
+    }
+}
+
+function syncHomesFloodedStatTitle(minFt) {
+    if (!homesFloodedStat) {
+        return;
+    }
+    const v = Math.max(0, Number(minFt) || 0);
+    const fieldLabel = currentCentroidField === "TD_transpo" ? "Transported" : "Historic";
+    homesFloodedStat.title =
+        v <= 0
+            ? `Server count for ${fieldLabel}: depth > 0 ft, excluding −9999.`
+            : `Server count for ${fieldLabel}: depth ≥ ${v.toFixed(1)} ft (same floor as the depth-filtered raster), excluding −9999.`;
+}
+
+/** Counts homes with depth &gt; min depth filter (same floor as the raster); excludes −9999. Field follows scenario / advanced point field. */
+async function refreshFloodedHomesCount() {
+    if (!homesFloodedCountEl || !overlayLayers?.centroids) {
+        return;
+    }
+    const field = currentCentroidField;
+    if (field !== "TD_histori" && field !== "TD_transpo") {
+        return;
+    }
+
+    const minFt = getFloodMinDepthFt();
+    syncHomesFloodedStatTitle(minFt);
+
+    homesFloodedCountEl.classList.add("homes-flooded-stat__value--pending");
+    if (homesFloodedStat) {
+        homesFloodedStat.setAttribute("aria-busy", "true");
+    }
+
+    const depthPredicate =
+        minFt <= 0 ? `${field} > 0` : `${field} >= ${minFt}`;
+    const where = `${depthPredicate} AND ${field} <> -9999`;
+    try {
+        await overlayLayers.centroids.load();
+        const count = await overlayLayers.centroids.queryFeatureCount({ where });
+        homesFloodedCountEl.textContent = count.toLocaleString();
+    } catch {
+        homesFloodedCountEl.textContent = "—";
+    } finally {
+        homesFloodedCountEl.classList.remove("homes-flooded-stat__value--pending");
+        if (homesFloodedStat) {
+            homesFloodedStat.removeAttribute("aria-busy");
+        }
+    }
 }
 
 function updateScenarioUI(selectedRaster) {
@@ -610,6 +769,7 @@ function applyRasterScenario(selectedRaster) {
     if (homesOn) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
+    void refreshFloodedHomesCount();
 }
 
 basemapDropdown.addEventListener("change", (event) => {
@@ -631,6 +791,9 @@ function setHomesEnabled(on) {
     if (homesPointLegend) {
         homesPointLegend.hidden = !on;
     }
+    if (homesFloodedStat) {
+        homesFloodedStat.hidden = !on;
+    }
     if (!on) {
         cancelHomesHoverPoll();
         hideHomesHoverPopup();
@@ -646,6 +809,9 @@ function setHomesEnabled(on) {
 centroidsToggle.addEventListener("click", () => {
     const next = centroidsToggle.getAttribute("aria-checked") !== "true";
     setHomesEnabled(next);
+    if (next) {
+        void refreshFloodedHomesCount();
+    }
 });
 
 setHomesEnabled(true);
@@ -655,6 +821,7 @@ centroidFieldDropdown.addEventListener("change", (event) => {
     if (centroidsToggle.getAttribute("aria-checked") === "true") {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
+    void refreshFloodedHomesCount();
 });
 
 opacitySlider.addEventListener("input", (event) => {
@@ -669,6 +836,8 @@ function applyFloodMinDepthFt(minFt) {
     const v = Math.max(0, Number(minFt) || 0);
     overlayLayers.historic.minDepthFt = v;
     overlayLayers.transported.minDepthFt = v;
+    syncDepthFilterReadout(v);
+    void refreshFloodedHomesCount();
     if (currentFloodLayer === "historic") {
         overlayLayers.historic.refresh();
     } else {
@@ -679,9 +848,9 @@ function applyFloodMinDepthFt(minFt) {
 if (depthFilterSlider && depthFilterValue) {
     depthFilterSlider.addEventListener("input", (event) => {
         const v = Number.parseFloat(event.target.value);
-        depthFilterValue.textContent = `${v.toFixed(1)} ft`;
         applyFloodMinDepthFt(v);
     });
+    syncDepthFilterReadout(Number.parseFloat(depthFilterSlider.value) || 0);
 }
 
 controlsToggle.addEventListener("click", () => {

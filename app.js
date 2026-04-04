@@ -11,7 +11,8 @@ const [
     FeatureLayer,
     Basemap,
     Viewpoint,
-    reactiveUtils
+    reactiveUtils,
+    FeatureFilter
 ] = await $arcgis.import([
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
@@ -21,7 +22,8 @@ const [
     "@arcgis/core/layers/FeatureLayer.js",
     "@arcgis/core/Basemap.js",
     "@arcgis/core/Viewpoint.js",
-    "@arcgis/core/core/reactiveUtils.js"
+    "@arcgis/core/core/reactiveUtils.js",
+    "@arcgis/core/layers/support/FeatureFilter.js"
 ]);
 
 const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
@@ -30,7 +32,7 @@ const centroidServiceUrl = "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/
 const historicFloodServiceUrl =
     "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_BW/MapServer";
 const transportedFloodServiceUrl =
-    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_tif/MapServer";
+    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_BW/MapServer";
 
 /** Grayscale tile → feet for filtering / alignment with modeled depths (black = this depth). */
 const FLOOD_RASTER_DATA_MAX_DEPTH_FT = 10;
@@ -456,6 +458,13 @@ const view = new MapView({
 
 await view.when();
 
+/** Client-side attribute filter (avoids server round-trips on each depth change). */
+let centroidsLayerView = null;
+view.whenLayerView(overlayLayers.centroids).then((lv) => {
+    centroidsLayerView = lv;
+    syncCentroidsLayerViewFilter();
+});
+
 const homesHoverPopup = document.getElementById("homes-hover-popup");
 
 function formatDepthFt(value) {
@@ -695,12 +704,18 @@ function syncCentroidFieldDropdown() {
     centroidFieldDropdown.value = currentCentroidField;
 }
 
+/** Depth filter UI / raster / query use 0.1 ft steps (avoids range float noise). */
+function quantizeDepthFilterFt(x) {
+    const n = Math.max(0, Number(x) || 0);
+    return Math.round(n * 10) / 10;
+}
+
 function getFloodMinDepthFt() {
-    return Math.max(0, Number(overlayLayers?.historic?.minDepthFt) || 0);
+    return quantizeDepthFilterFt(overlayLayers?.historic?.minDepthFt);
 }
 
 function formatDepthFilterReadout(minFt) {
-    const v = Math.max(0, Number(minFt) || 0);
+    const v = quantizeDepthFilterFt(minFt);
     if (v <= 0) {
         return "Any depth";
     }
@@ -717,7 +732,7 @@ function syncHomesFloodedStatTitle(minFt) {
     if (!homesFloodedStat) {
         return;
     }
-    const v = Math.max(0, Number(minFt) || 0);
+    const v = quantizeDepthFilterFt(minFt);
     const fieldLabel = currentCentroidField === "TD_transpo" ? "Transported" : "Historic";
     homesFloodedStat.title =
         v <= 0
@@ -725,13 +740,32 @@ function syncHomesFloodedStatTitle(minFt) {
             : `Server count for ${fieldLabel}: depth ≥ ${v.toFixed(1)} ft (same floor as the depth-filtered raster), excluding −9999.`;
 }
 
+/** Same SQL as the homes layer filter and depth-filtered point display. */
+function buildCentroidDepthWhereClause() {
+    const field = currentCentroidField;
+    if (field !== "TD_histori" && field !== "TD_transpo") {
+        return null;
+    }
+    const minFt = getFloodMinDepthFt();
+    const depthPredicate = minFt <= 0 ? `${field} > 0` : `${field} >= ${minFt}`;
+    return `${depthPredicate} AND ${field} <> -9999`;
+}
+
+function syncCentroidsLayerViewFilter() {
+    if (!centroidsLayerView) {
+        return;
+    }
+    const clause = buildCentroidDepthWhereClause();
+    centroidsLayerView.filter = clause ? new FeatureFilter({ where: clause }) : null;
+}
+
 /** Counts homes with depth &gt; min depth filter (same floor as the raster); excludes −9999. Field follows scenario / advanced point field. */
 async function refreshFloodedHomesCount() {
     if (!homesFloodedCountEl || !overlayLayers?.centroids) {
         return;
     }
-    const field = currentCentroidField;
-    if (field !== "TD_histori" && field !== "TD_transpo") {
+    const where = buildCentroidDepthWhereClause();
+    if (!where) {
         return;
     }
 
@@ -743,9 +777,6 @@ async function refreshFloodedHomesCount() {
         homesFloodedStat.setAttribute("aria-busy", "true");
     }
 
-    const depthPredicate =
-        minFt <= 0 ? `${field} > 0` : `${field} >= ${minFt}`;
-    const where = `${depthPredicate} AND ${field} <> -9999`;
     try {
         await overlayLayers.centroids.load();
         const count = await overlayLayers.centroids.queryFeatureCount({ where });
@@ -798,6 +829,7 @@ function applyRasterScenario(selectedRaster) {
     if (homesOn) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
+    syncCentroidsLayerViewFilter();
     void refreshFloodedHomesCount();
 }
 
@@ -832,6 +864,7 @@ function setHomesEnabled(on) {
     }
     if (on) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
+        syncCentroidsLayerViewFilter();
     }
 }
 
@@ -850,6 +883,7 @@ centroidFieldDropdown.addEventListener("change", (event) => {
     if (centroidsToggle.getAttribute("aria-checked") === "true") {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
+    syncCentroidsLayerViewFilter();
     void refreshFloodedHomesCount();
 });
 
@@ -862,10 +896,14 @@ opacitySlider.addEventListener("input", (event) => {
 });
 
 function applyFloodMinDepthFt(minFt) {
-    const v = Math.max(0, Number(minFt) || 0);
+    const v = quantizeDepthFilterFt(minFt);
     overlayLayers.historic.minDepthFt = v;
     overlayLayers.transported.minDepthFt = v;
+    if (depthFilterSlider) {
+        depthFilterSlider.value = String(v);
+    }
     syncDepthFilterReadout(v);
+    syncCentroidsLayerViewFilter();
     void refreshFloodedHomesCount();
     if (currentFloodLayer === "historic") {
         overlayLayers.historic.refresh();
@@ -876,10 +914,10 @@ function applyFloodMinDepthFt(minFt) {
 
 if (depthFilterSlider && depthFilterValue) {
     depthFilterSlider.addEventListener("input", (event) => {
-        const v = Number.parseFloat(event.target.value);
+        const v = quantizeDepthFilterFt(event.target.value);
         applyFloodMinDepthFt(v);
     });
-    syncDepthFilterReadout(Number.parseFloat(depthFilterSlider.value) || 0);
+    syncDepthFilterReadout(quantizeDepthFilterFt(depthFilterSlider.value));
 }
 
 controlsToggle.addEventListener("click", () => {

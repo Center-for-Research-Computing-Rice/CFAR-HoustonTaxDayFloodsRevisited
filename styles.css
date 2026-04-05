@@ -237,6 +237,60 @@ html, body, #viewDiv {
     color: #2c2820;
     padding: 9px 12px;
     user-select: none;
+    border-radius: 7px;
+}
+
+.panel-details-summary__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+
+.panel-details-summary__text {
+    min-width: 0;
+}
+
+.panel-details-summary__arrow {
+    flex-shrink: 0;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 600;
+    color: #5c564a;
+}
+
+.panel-details-summary__arrow::before {
+    content: "▲";
+}
+
+.panel-details[open] > .panel-details-summary .panel-details-summary__arrow::before {
+    content: "▼";
+}
+
+@keyframes about-comparison-summary-attention {
+    0% {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+    40% {
+        outline: 2px solid #c45c26;
+        outline-offset: 2px;
+    }
+    100% {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+}
+
+.panel-details-summary--attention {
+    animation: about-comparison-summary-attention 0.7s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-details-summary--attention {
+        animation: none;
+    }
 }
 
 .panel-details-summary::-webkit-details-marker {

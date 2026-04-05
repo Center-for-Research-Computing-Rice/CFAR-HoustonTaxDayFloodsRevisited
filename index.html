@@ -54,14 +54,20 @@
             </div>
 
             <div class="sidebar-body">
-                <details class="panel-details" open>
-                    <summary class="panel-details-summary">About this comparison</summary>
+                <details class="panel-details" id="about-comparison-details">
+                    <summary class="panel-details-summary" id="about-comparison-summary">
+                        <span class="panel-details-summary__row">
+                            <span class="panel-details-summary__text">About this comparison</span>
+                            <span class="panel-details-summary__arrow" aria-hidden="true"></span>
+                        </span>
+                    </summary>
                     <div class="panel-details-body">
                         <h2 id="narrative-heading" class="visually-hidden">About this comparison</h2>
                         <p id="about-comparison-lede" class="narrative-lede"></p>
                         <ul class="narrative-list">
                             <li id="about-comparison-historic"></li>
                             <li id="about-comparison-transported"></li>
+                            <li id="about-comparison-difference"></li>
                         </ul>
                     </div>
                 </details>
@@ -79,8 +85,8 @@
                                 aria-controls="tip-scenario"
                             >?</button>
                             <div id="tip-scenario" class="tip-bubble" role="tooltip">
-                                Pick <strong>Historic</strong> (typical risk here) or <strong>Transported</strong> (Tax Day 2016 placed on this geography). The flood raster on the map follows your choice.
-                                Use <strong>Flood opacity</strong> to fade the raster and see streets underneath. Affected home points follow the same scenario.
+                                Pick <strong>Historic</strong>, <strong>Transported</strong> (Tax Day 2016 placed on this geography), or <strong>Difference</strong> (transported minus historic depth on the raster; homes that are dry in Historic but wet in Transported).
+                                Use <strong>Flood opacity</strong> to fade the raster. Affected home points follow the scenario (or the difference filter).
                             </div>
                         </span>
                     </div>
@@ -102,6 +108,15 @@
                             title="Depths if the April 2016 Tax Day flood were placed on this landscape."
                         >
                             <span class="scenario-btn-title">Transported</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="scenario-btn"
+                            data-scenario="difference"
+                            aria-pressed="false"
+                            title="Raster: transported depth minus historic where gain is positive. Homes: not flooded in Historic but flooded in Transported."
+                        >
+                            <span class="scenario-btn-title">Difference</span>
                         </button>
                     </div>
                     <div id="opacity-control">
@@ -234,7 +249,7 @@
         </div>
         <div id="flood-legend">
             <div class="flood-legend-header">
-                <h3>Flood depth</h3>
+                <h3 id="flood-legend-heading">Flood depth</h3>
                 <span class="tip-wrap tip-wrap--click-only tip-wrap--wide tip-wrap--map-bounded">
                     <button
                         type="button"
@@ -245,7 +260,7 @@
                         aria-controls="tip-flood-legend"
                     >?</button>
                     <div id="tip-flood-legend" class="tip-bubble tip-bubble--long" role="tooltip">
-                        <div class="tip-flood-legend-body">
+                        <div id="tip-flood-legend-body-absolute" class="tip-flood-legend-body">
                             <p>
                                 <strong>0.0 ft — None.</strong>
                                 No flooding.
@@ -265,6 +280,18 @@
                             <p>
                                 <strong>2+ ft — Extreme.</strong>
                                 At 2 feet, even large SUVs and trucks begin to lose tire friction and float, making them susceptible to being swept away (Dworkin, 2007; Shah et al., 2018). At home, flooding above 2 foot is defined as Extreme Hazard level. Hydrostatic pressure on walls can cause structural collapse if the water is not balanced internally (NBS, 2025). Residential and utility sectors (like power and sewage) also often experience system-wide failure (Wang et al., 2026).
+                            </p>
+                            <p>
+                                <strong>Difference mode</strong> colors pixels by <strong>positive depth gain</strong>: modeled transported depth minus historic depth (feet). Areas with no gain or a decrease are not shown on the flood layer.
+                            </p>
+                            <p>
+                                The same color ramp as Historic/Transported is used so you can compare intensity, but the foot ranges describe <strong>how much deeper</strong> the transported scenario is—not total water depth. The Nuisance / Danger / Major / Extreme narratives in the Historic and Transported legends refer to absolute flood levels; they do not apply literally to these increments.
+                            </p>
+                            <p>
+                                <strong>0.1–0.4 ft</strong> — small additional depth.<br>
+                                <strong>0.5–1.0 ft</strong> — moderate gain.<br>
+                                <strong>1.1–2.0 ft</strong> — large gain.<br>
+                                <strong>2+ ft</strong> — very large gain (capped on the color scale like the depth maps).
                             </p>
                         </div>
                     </div>

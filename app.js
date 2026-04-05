@@ -82,7 +82,7 @@ const WATERSHED_DEFS = {
         id: "clear-creek",
         label: "Clear Creek",
         aboutLede:
-            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Clear Creek watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Clear Creek area, instead of outer Houston.",
+            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Clear Creek watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Clear Creek area, instead of outer Houston. Below: three map scenarios—Historic, Transported, and Difference.",
         aboutHistoricHtml:
             '<span class="narrative-term">Historic</span> — Flood depths for this area during the actual Tax Day Storm of April 17–18, 2016.',
         aboutTransportedHtml:
@@ -102,7 +102,7 @@ const WATERSHED_DEFS = {
         id: "huntings-bayou",
         label: "Huntings Bayou",
         aboutLede:
-            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Huntings Bayou watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Huntings Bayou area, instead of outer Houston.",
+            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Huntings Bayou watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Huntings Bayou area, instead of outer Houston. Below: three map scenarios—Historic, Transported, and Difference.",
         aboutHistoricHtml:
             '<span class="narrative-term">Historic</span> — Flood depths for this area during the actual Tax Day Storm of April 17–18, 2016.',
         aboutTransportedHtml:
@@ -119,6 +119,10 @@ const WATERSHED_DEFS = {
         homeZoom: null
     }
 };
+
+/** Same for every watershed; shown in About → narrative list. */
+const ABOUT_COMPARISON_DIFFERENCE_HTML =
+    '<span class="narrative-term">Difference</span> — The flood layer shows <strong>transported minus historic</strong> depth (feet) wherever that gain is positive—where placing the Tax Day 2016 storm on this watershed would add water beyond what the actual 2016 event produced. <strong>Affected homes</strong> are filtered to show only those that are not flooded in Historic but flooded in Transported.';
 
 /**
  * Water-themed display ramps (t = 0 shallow … 1 deep on the compressed color scale).
@@ -276,6 +280,69 @@ function syncFloodLegendSwatches() {
     }
 }
 
+const FLOOD_LEGEND_SCENARIO_COPY = {
+    absolute: {
+        heading: "Flood depth",
+        tipAria: "Help: flood depth legend classes",
+        rows: {
+            none: { label: "None", depth: "0.0 ft" },
+            nuisance: { label: "Nuisance", depth: "0.1–0.4 ft" },
+            danger: { label: "Danger", depth: "0.5–1.0 ft" },
+            major: { label: "Major", depth: "1.1–2.0 ft" },
+            extreme: { label: "Extreme", depth: "2+ ft" }
+        }
+    },
+    difference: {
+        heading: "Depth gain",
+        tipAria: "Help: depth gain legend (Difference mode)",
+        rows: {
+            none: { label: "Not shown", depth: "≤ 0 ft gain" },
+            nuisance: { label: "Low gain", depth: "0.1–0.4 ft" },
+            danger: { label: "Moderate gain", depth: "0.5–1.0 ft" },
+            major: { label: "Large gain", depth: "1.1–2.0 ft" },
+            extreme: { label: "Very large gain", depth: "2+ ft" }
+        }
+    }
+};
+
+/** Legend categories describe absolute depths for Historic/Transported; Difference uses the same color scale for positive transported − historic gain. */
+function syncFloodLegendForScenario(floodScenarioId) {
+    const mode = floodScenarioId === "difference" ? "difference" : "absolute";
+    const copy = FLOOD_LEGEND_SCENARIO_COPY[mode];
+    const heading = document.getElementById("flood-legend-heading");
+    if (heading) {
+        heading.textContent = copy.heading;
+    }
+    const tipBtn = document.getElementById("tip-btn-flood-legend");
+    if (tipBtn) {
+        tipBtn.setAttribute("aria-label", copy.tipAria);
+    }
+    const tipAbs = document.getElementById("tip-flood-legend-body-absolute");
+    const tipDiff = document.getElementById("tip-flood-legend-body-difference");
+    if (tipAbs && tipDiff) {
+        tipAbs.hidden = mode === "difference";
+        tipDiff.hidden = mode !== "difference";
+    }
+    const root = document.getElementById("flood-legend");
+    if (!root) {
+        return;
+    }
+    for (const [cls, { label, depth }] of Object.entries(copy.rows)) {
+        const item = root.querySelector(`.legend-item[data-depth-class="${cls}"]`);
+        if (!item) {
+            continue;
+        }
+        const labelEl = item.querySelector(".legend-label");
+        const depthEl = item.querySelector(".legend-depth");
+        if (labelEl) {
+            labelEl.textContent = label;
+        }
+        if (depthEl) {
+            depthEl.textContent = depth;
+        }
+    }
+}
+
 function getFloodColor(depth) {
     if (depth === null || depth === undefined) return "#cccccc";
     const d = Number(depth);
@@ -321,6 +388,19 @@ function createBasemap(id) {
 
 let currentCentroidField = "TD_histori";
 let currentFloodLayer = "historic";
+
+/** Difference mode: filter leaves only transported-only floods; one symbol is enough. */
+function createDifferenceCentroidSimpleRenderer() {
+    return {
+        type: "simple",
+        symbol: {
+            type: "simple-marker",
+            size: 4,
+            color: "#ff8c00",
+            outline: { color: "#dfdcdcbe", width: 0.5 }
+        }
+    };
+}
 
 function createCentroidRenderer(fieldName) {
     return {
@@ -622,6 +702,150 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
     }
 }
 
+function depthFromBwSample(data, i, rangeMin, rangeMax) {
+    const span = Math.max(1e-6, rangeMax - rangeMin);
+    if (data[i + 3] < 8) {
+        return rangeMin;
+    }
+    const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    const depthNorm = (255 - lum) / 255;
+    return rangeMin + depthNorm * span;
+}
+
+/**
+ * Per-pixel transported − historic (ft); transparent where gain ≤ 0.
+ * Uses the same color compression as single-scenario rasters (depth gain vs `FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT`).
+ */
+function compositeBwDifferenceTile(minDepthFt, hMin, hMax, tMin, tMax, imageBitmapH, imageBitmapT) {
+    const w = Math.min(imageBitmapH.width, imageBitmapT.width);
+    const h = Math.min(imageBitmapH.height, imageBitmapT.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+        return canvas;
+    }
+    ctx.drawImage(imageBitmapH, 0, 0, w, h, 0, 0, w, h);
+    const idH = ctx.getImageData(0, 0, w, h);
+    ctx.drawImage(imageBitmapT, 0, 0, w, h, 0, 0, w, h);
+    const idT = ctx.getImageData(0, 0, w, h);
+    const out = ctx.createImageData(w, h);
+    const dh = idH.data;
+    const dt = idT.data;
+    const o = out.data;
+    const minD = Math.max(0, Number(minDepthFt) || 0);
+    const colorCap = Math.max(1e-6, FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT);
+    const stops = getFloodRasterDisplayStops();
+    for (let i = 0; i < o.length; i += 4) {
+        const depthH = depthFromBwSample(dh, i, hMin, hMax);
+        const depthT = depthFromBwSample(dt, i, tMin, tMax);
+        const diffFt = depthT - depthH;
+        if (diffFt <= 0) {
+            o[i + 3] = 0;
+            continue;
+        }
+        if (!depthPassesMinFilterFt(diffFt, minD)) {
+            o[i + 3] = 0;
+            continue;
+        }
+        const tColor = Math.min(1, diffFt / colorCap);
+        const { r: nr, g: ng, b: nb } = floodDepthDisplayRgbFromNorm(tColor, stops);
+        o[i] = nr;
+        o[i + 1] = ng;
+        o[i + 2] = nb;
+        o[i + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+    return canvas;
+}
+
+class DifferenceFloodTileLayer extends BaseTileLayer {
+    constructor({
+        historicTileRoot,
+        transportedTileRoot,
+        floodScenarioId,
+        minDepthFt,
+        spatialReference,
+        fullExtent,
+        tileInfo,
+        floodHistoricMinFt,
+        floodHistoricMaxFt,
+        floodTransportedMinFt,
+        floodTransportedMaxFt,
+        ...layerOptions
+    }) {
+        super({
+            spatialReference,
+            fullExtent,
+            tileInfo,
+            ...layerOptions
+        });
+        this._hRoot = historicTileRoot.replace(/\/$/, "");
+        this._tRoot = transportedTileRoot.replace(/\/$/, "");
+        this.minDepthFt = minDepthFt ?? 0;
+        this.floodScenarioId = floodScenarioId;
+        this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
+        this._hMin = Number.isFinite(floodHistoricMinFt) ? floodHistoricMinFt : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.minFt;
+        this._hMax = Number.isFinite(floodHistoricMaxFt) ? floodHistoricMaxFt : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.maxFt;
+        this._tMin = Number.isFinite(floodTransportedMinFt) ? floodTransportedMinFt : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.minFt;
+        this._tMax = Number.isFinite(floodTransportedMaxFt) ? floodTransportedMaxFt : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.maxFt;
+    }
+
+    getEmptyTileCanvas() {
+        const size = this.tileInfo?.rows || 256;
+        const c = document.createElement("canvas");
+        c.width = size;
+        c.height = size;
+        return c;
+    }
+
+    fetchTile(level, row, col, options) {
+        if (this.floodScenarioId !== currentFloodLayer || this.visible === false) {
+            return Promise.resolve(this.getEmptyTileCanvas());
+        }
+        const cov = this._coverageEnvelope ?? envelopeFromLayerExtent(this.fullExtent);
+        const tileEnv = tileEnvelopeFromRowCol(level, row, col, this.tileInfo);
+        if (cov && tileEnv && !envelopesIntersect(cov, tileEnv)) {
+            return Promise.resolve(this.getEmptyTileCanvas());
+        }
+        const hUrl = `${this._hRoot}/tile/${level}/${row}/${col}`;
+        const tUrl = `${this._tRoot}/tile/${level}/${row}/${col}`;
+        const signal = options?.signal;
+        return Promise.all([
+            fetch(hUrl, { signal }).then((r) => (r.ok ? r.blob() : null)),
+            fetch(tUrl, { signal }).then((r) => (r.ok ? r.blob() : null))
+        ])
+            .then((blobs) => {
+                if (!blobs[0] || !blobs[1]) {
+                    return null;
+                }
+                return Promise.all([createImageBitmap(blobs[0]), createImageBitmap(blobs[1])]);
+            })
+            .then((bitmaps) => {
+                if (!bitmaps) {
+                    return this.getEmptyTileCanvas();
+                }
+                const [bmH, bmT] = bitmaps;
+                try {
+                    return compositeBwDifferenceTile(
+                        this.minDepthFt ?? 0,
+                        this._hMin,
+                        this._hMax,
+                        this._tMin,
+                        this._tMax,
+                        bmH,
+                        bmT
+                    );
+                } finally {
+                    bmH.close?.();
+                    bmT.close?.();
+                }
+            })
+            .catch(() => this.getEmptyTileCanvas());
+    }
+}
+
 async function loadWatershedLayerPack(def) {
     const hUrl = def.historicTileUrl.replace(/\/$/, "");
     const tUrl = def.transportedTileUrl.replace(/\/$/, "");
@@ -665,6 +889,21 @@ async function loadWatershedLayerPack(def) {
         opacity: 0.7,
         visible: false
     });
+    const difference = new DifferenceFloodTileLayer({
+        historicTileRoot: hUrl,
+        transportedTileRoot: tUrl,
+        floodScenarioId: "difference",
+        minDepthFt: 0,
+        spatialReference: metaH.spatialReference,
+        fullExtent: metaH.fullExtent,
+        tileInfo: metaH.tileInfo,
+        floodHistoricMinFt: rangeH.minFt,
+        floodHistoricMaxFt: rangeH.maxFt,
+        floodTransportedMinFt: rangeT.minFt,
+        floodTransportedMaxFt: rangeT.maxFt,
+        opacity: 0.7,
+        visible: false
+    });
     const centroids = new FeatureLayer({
         url: def.centroidUrl,
         renderer: createCentroidRenderer(def.historicField),
@@ -694,6 +933,7 @@ async function loadWatershedLayerPack(def) {
         def,
         historic,
         transported,
+        difference,
         centroids,
         depthFilterMaxFt,
         homeGoTo
@@ -716,6 +956,7 @@ let currentWatershedId = "clear-creek";
 let overlayLayers = {
     historic: clearCreekPack.historic,
     transported: clearCreekPack.transported,
+    difference: clearCreekPack.difference,
     centroids: clearCreekPack.centroids
 };
 
@@ -725,9 +966,11 @@ const map = new ArcGISMap({
     layers: [
         clearCreekPack.historic,
         clearCreekPack.transported,
+        clearCreekPack.difference,
         clearCreekPack.centroids,
         huntingsBayouPack.historic,
         huntingsBayouPack.transported,
+        huntingsBayouPack.difference,
         huntingsBayouPack.centroids
     ]
 });
@@ -794,7 +1037,27 @@ function getHomesFeatureKey(graphic) {
     return null;
 }
 
-function buildHomesHoverContent(historic, transportedDepth) {
+function formatDepthGainFt(historicVal, transportedVal) {
+    const h = Number(historicVal);
+    const t = Number(transportedVal);
+    if (!Number.isFinite(h) || !Number.isFinite(t)) {
+        return "—";
+    }
+    if (historicVal === -9999 || transportedVal === -9999) {
+        return "—";
+    }
+    return `${(t - h).toFixed(1)} ft`;
+}
+
+function buildHomesHoverContent(historic, transportedDepth, scenario) {
+    const gainRow =
+        scenario === "difference"
+            ? `
+        <div class="homes-hover-popup__row">
+            <span class="homes-hover-popup__label">Depth gain (T − H)</span>
+            <span class="homes-hover-popup__value">${formatDepthGainFt(historic, transportedDepth)}</span>
+        </div>`
+            : "";
     return `
         <div class="homes-hover-popup__title">Flood depth</div>
         <div class="homes-hover-popup__row">
@@ -804,7 +1067,7 @@ function buildHomesHoverContent(historic, transportedDepth) {
         <div class="homes-hover-popup__row">
             <span class="homes-hover-popup__label">Transported Flood</span>
             <span class="homes-hover-popup__value">${formatDepthFt(transportedDepth)}</span>
-        </div>`;
+        </div>${gainRow}`;
 }
 
 function positionHomesHoverPopup(screenX, screenY) {
@@ -831,7 +1094,7 @@ function showHomesHoverPopup(screenX, screenY, attrs) {
     const wdef = WATERSHED_DEFS[currentWatershedId];
     const historic = attrs?.[wdef.historicField];
     const transportedDepth = attrs?.[wdef.transportedField];
-    homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transportedDepth);
+    homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transportedDepth, currentFloodLayer);
     homesHoverPopup.hidden = false;
     homesHoverPopup.setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => positionHomesHoverPopup(screenX, screenY));
@@ -1020,6 +1283,13 @@ function syncHomesFloodedStatTitle(minFt) {
     }
     const v = quantizeDepthFilterFt(minFt);
     const wdef = WATERSHED_DEFS[currentWatershedId];
+    if (currentFloodLayer === "difference") {
+        homesFloodedStat.title =
+            v <= 0
+                ? "Homes not flooded in Historic (≤ 0 ft or −9999) but flooded in Transported (> 0 ft); transported depth ≥ 0 ft."
+                : `Same pattern with transported depth ≥ ${v.toFixed(1)} ft (matches depth filter).`;
+        return;
+    }
     const fieldLabel = currentCentroidField === wdef.transportedField ? "Transported" : "Historic";
     homesFloodedStat.title =
         v <= 0
@@ -1030,11 +1300,19 @@ function syncHomesFloodedStatTitle(minFt) {
 /** Same SQL as the homes layer filter and depth-filtered point display. */
 function buildCentroidDepthWhereClause() {
     const wdef = WATERSHED_DEFS[currentWatershedId];
+    const minFt = getFloodMinDepthFt();
+    if (currentFloodLayer === "difference") {
+        const hf = wdef.historicField;
+        const tf = wdef.transportedField;
+        const dryHistoric = `(${hf} <= 0 OR ${hf} = -9999)`;
+        const wetTransported = `${tf} > 0 AND ${tf} <> -9999`;
+        const tMin = minFt <= 0 ? "" : ` AND ${tf} >= ${minFt}`;
+        return `${dryHistoric} AND ${wetTransported}${tMin}`;
+    }
     const field = currentCentroidField;
     if (field !== wdef.historicField && field !== wdef.transportedField) {
         return null;
     }
-    const minFt = getFloodMinDepthFt();
     const depthPredicate = minFt <= 0 ? `${field} >= 0` : `${field} >= ${minFt}`;
     return `${depthPredicate} AND ${field} <> -9999`;
 }
@@ -1090,10 +1368,14 @@ function updateScenarioUI(selectedRaster) {
             scenarioHint.textContent = "Showing: Historic baseline.";
             scenarioHint.title =
                 "Modeled flood depths for typical conditions in this area—the historic baseline. Compare with Transported to see Tax Day 2016 applied here.";
-        } else {
+        } else if (selectedRaster === "transported") {
             scenarioHint.textContent = "Showing: Transported Tax Day 2016.";
             scenarioHint.title =
                 "Depths as if the April 2016 Tax Day flood were placed on this landscape. Contrast with Historic to see the difference from typical risk.";
+        } else {
+            scenarioHint.textContent = "Showing: Difference (transported − historic).";
+            scenarioHint.title =
+                "Raster shows depth gained (transported minus historic) where that gain is positive. Homes: dry in Historic but flooded in Transported. Depth filter applies to transported depth and to positive gain on the raster.";
         }
     }
 }
@@ -1106,12 +1388,27 @@ function syncAllWatershedLayerVisibility() {
         if (!active) {
             pack.historic.visible = false;
             pack.transported.visible = false;
+            if (pack.difference) {
+                pack.difference.visible = false;
+            }
             pack.centroids.visible = false;
         } else {
             pack.historic.visible = currentFloodLayer === "historic";
             pack.transported.visible = currentFloodLayer === "transported";
+            if (pack.difference) {
+                pack.difference.visible = currentFloodLayer === "difference";
+            }
             pack.centroids.visible = !!homesOn;
         }
+    }
+}
+
+function applyCentroidsRendererForCurrentScenario() {
+    const wdef = WATERSHED_DEFS[currentWatershedId];
+    if (currentFloodLayer === "difference") {
+        overlayLayers.centroids.renderer = createDifferenceCentroidSimpleRenderer();
+    } else {
+        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
     }
 }
 
@@ -1119,15 +1416,22 @@ function applyRasterScenario(selectedRaster) {
     currentFloodLayer = selectedRaster;
 
     const wdef = WATERSHED_DEFS[currentWatershedId];
-    currentCentroidField = selectedRaster === "historic" ? wdef.historicField : wdef.transportedField;
+    if (selectedRaster === "historic") {
+        currentCentroidField = wdef.historicField;
+    } else if (selectedRaster === "transported") {
+        currentCentroidField = wdef.transportedField;
+    } else {
+        currentCentroidField = wdef.transportedField;
+    }
 
     syncAllWatershedLayerVisibility();
 
     updateScenarioUI(selectedRaster);
+    syncFloodLegendForScenario(selectedRaster);
 
     const homesOn = centroidsToggle.getAttribute("aria-checked") === "true";
     if (homesOn) {
-        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
+        applyCentroidsRendererForCurrentScenario();
     }
     syncCentroidsLayerViewFilter();
     void refreshFloodedHomesCount();
@@ -1138,6 +1442,7 @@ function refreshFloodRasterTiles() {
         const pack = watershedLayerSets[id];
         pack.historic.refresh?.();
         pack.transported.refresh?.();
+        pack.difference?.refresh?.();
     }
 }
 
@@ -1188,7 +1493,7 @@ function setHomesEnabled(on) {
     }
     syncAllWatershedLayerVisibility();
     if (on) {
-        overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
+        applyCentroidsRendererForCurrentScenario();
         syncCentroidsLayerViewFilter();
     }
 }
@@ -1204,9 +1509,10 @@ centroidsToggle.addEventListener("click", () => {
 setHomesEnabled(true);
 
 syncAboutComparisonNarrative(currentWatershedId);
+queueMicrotask(() => flashAboutComparisonSummaryOutline());
 
 function applyFloodOpacityFromSlider() {
-    if (!opacitySlider || !overlayLayers?.historic || !overlayLayers?.transported) {
+    if (!opacitySlider || !overlayLayers?.historic || !overlayLayers?.transported || !overlayLayers?.difference) {
         return;
     }
     const transparency = Number.parseInt(opacitySlider.value, 10);
@@ -1216,6 +1522,7 @@ function applyFloodOpacityFromSlider() {
     const opacity = (100 - transparency) / 100;
     overlayLayers.historic.opacity = opacity;
     overlayLayers.transported.opacity = opacity;
+    overlayLayers.difference.opacity = opacity;
     if (opacityValue) {
         opacityValue.textContent = `${100 - transparency}%`;
     }
@@ -1236,6 +1543,7 @@ function applyFloodMinDepthFt(minFt) {
     const v = Math.min(quantizeDepthFilterFt(minFt), maxFt);
     overlayLayers.historic.minDepthFt = v;
     overlayLayers.transported.minDepthFt = v;
+    overlayLayers.difference.minDepthFt = v;
     if (depthFilterSlider) {
         depthFilterSlider.value = String(v);
     }
@@ -1244,8 +1552,10 @@ function applyFloodMinDepthFt(minFt) {
     void refreshFloodedHomesCount();
     if (currentFloodLayer === "historic") {
         overlayLayers.historic.refresh();
-    } else {
+    } else if (currentFloodLayer === "transported") {
         overlayLayers.transported.refresh();
+    } else {
+        overlayLayers.difference?.refresh?.();
     }
 }
 
@@ -1338,6 +1648,29 @@ function syncAboutComparisonNarrative(wsId) {
     if (liT && def.aboutTransportedHtml != null) {
         liT.innerHTML = def.aboutTransportedHtml;
     }
+    const liD = document.getElementById("about-comparison-difference");
+    if (liD) {
+        liD.innerHTML = ABOUT_COMPARISON_DIFFERENCE_HTML;
+    }
+}
+
+/** Draws attention to the collapsed About panel on first load (two outline pulses). */
+function flashAboutComparisonSummaryOutline() {
+    const summary = document.getElementById("about-comparison-summary");
+    if (!summary) {
+        return;
+    }
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return;
+    }
+    const done = () => {
+        summary.classList.remove("panel-details-summary--attention");
+        summary.removeEventListener("animationend", done);
+    };
+    summary.addEventListener("animationend", done);
+    requestAnimationFrame(() => {
+        summary.classList.add("panel-details-summary--attention");
+    });
 }
 
 async function switchWatershed(newId) {
@@ -1349,6 +1682,7 @@ async function switchWatershed(newId) {
     overlayLayers = {
         historic: watershedLayerSets[newId].historic,
         transported: watershedLayerSets[newId].transported,
+        difference: watershedLayerSets[newId].difference,
         centroids: watershedLayerSets[newId].centroids
     };
     applyWatershedUiState(newId);

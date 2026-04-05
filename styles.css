@@ -492,16 +492,25 @@ html, body, #viewDiv {
     gap: 8px;
 }
 
+.homes-legend-item--with-count {
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.homes-legend-lead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
 .homes-legend-swatch {
     width: 14px;
     height: 14px;
     border-radius: 50%;
     border: 1px solid #a69d8f;
     flex-shrink: 0;
-}
-
-.homes-legend-swatch--not-flooded {
-    background: #ffffff;
 }
 
 .homes-legend-swatch--flooded {
@@ -512,25 +521,8 @@ html, body, #viewDiv {
     line-height: 1.2;
 }
 
-.homes-flooded-stat {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 10px;
-    background: #fff;
-    border: 1px solid #e8e4dc;
-    border-radius: 8px;
-    font-size: 11px;
-    color: #454038;
-}
-
-.homes-flooded-stat__label {
-    font-weight: 600;
-    color: #2c2820;
-}
-
 .homes-flooded-stat__value {
+    flex-shrink: 0;
     font-size: 15px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;

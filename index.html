@@ -58,12 +58,10 @@
                     <summary class="panel-details-summary">About this comparison</summary>
                     <div class="panel-details-body">
                         <h2 id="narrative-heading" class="visually-hidden">About this comparison</h2>
-                        <p class="narrative-lede">
-                            In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Clear Creek watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Clear Creek area, instead of outer Houston.
-                        </p>
+                        <p id="about-comparison-lede" class="narrative-lede"></p>
                         <ul class="narrative-list">
-                            <li><span class="narrative-term">Historic</span> — Flood depths for this area during the actual, Tax Day Storm of April 17-18, 2016.</li>
-                            <li><span class="narrative-term">Transported</span> — Modeled flood depths, if the 2016 Tax Day Storm centered in the area.</li>
+                            <li id="about-comparison-historic"></li>
+                            <li id="about-comparison-transported"></li>
                         </ul>
                     </div>
                 </details>
@@ -150,24 +148,23 @@
                                 aria-controls="tip-homes"
                             >?</button>
                             <div id="tip-homes" class="tip-bubble" role="tooltip">
-                                Each point is a single-family home. <strong>White</strong> = not flooded in the selected scenario; <strong>orange</strong> = flooded.
+                                Each point is a single-family home. <br><strong>Orange</strong> = flooded in the selected scenario
                             </div>
                         </span>
                     </div>
                     <div id="homes-control-block" class="homes-control-block">
-                        <div id="homes-point-legend" class="homes-legend" role="group" aria-label="Legend for affected home points">
-                            <div class="homes-legend-item">
-                                <span class="homes-legend-swatch homes-legend-swatch--flooded" aria-hidden="true"></span>
-                                <span class="homes-legend-label">Flooded</span>
+                        <div id="homes-point-legend" class="homes-legend" role="group" aria-label="Affected home points">
+                            <div
+                                id="homes-flooded-stat"
+                                class="homes-legend-item homes-legend-item--with-count"
+                                aria-live="polite"
+                            >
+                                <span class="homes-legend-lead">
+                                    <span class="homes-legend-swatch homes-legend-swatch--flooded" aria-hidden="true"></span>
+                                    <span class="homes-legend-label">Flooded</span>
+                                </span>
+                                <span id="homes-flooded-count" class="homes-flooded-stat__value" aria-label="Flooded homes">—</span>
                             </div>
-                            <div class="homes-legend-item">
-                                <span class="homes-legend-swatch homes-legend-swatch--not-flooded" aria-hidden="true"></span>
-                                <span class="homes-legend-label">Not flooded</span>
-                            </div>
-                        </div>
-                        <div id="homes-flooded-stat" class="homes-flooded-stat" aria-live="polite">
-                            <span class="homes-flooded-stat__label">Flooded homes</span>
-                            <span id="homes-flooded-count" class="homes-flooded-stat__value">—</span>
                         </div>
                     </div>
                 </section>

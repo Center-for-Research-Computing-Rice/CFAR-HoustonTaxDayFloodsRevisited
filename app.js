@@ -81,6 +81,12 @@ const WATERSHED_DEFS = {
     "clear-creek": {
         id: "clear-creek",
         label: "Clear Creek",
+        aboutLede:
+            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Clear Creek watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Clear Creek area, instead of outer Houston.",
+        aboutHistoricHtml:
+            '<span class="narrative-term">Historic</span> — Flood depths for this area during the actual Tax Day Storm of April 17–18, 2016.',
+        aboutTransportedHtml:
+            '<span class="narrative-term">Transported</span> — Modeled flood depths if the 2016 Tax Day Storm were centered on the Clear Creek landscape.',
         historicTileUrl:
             "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_BW/MapServer",
         transportedTileUrl:
@@ -95,6 +101,12 @@ const WATERSHED_DEFS = {
     "huntings-bayou": {
         id: "huntings-bayou",
         label: "Huntings Bayou",
+        aboutLede:
+            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Huntings Bayou watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Huntings Bayou area, instead of outer Houston.",
+        aboutHistoricHtml:
+            '<span class="narrative-term">Historic</span> — Flood depths for this area during the actual Tax Day Storm of April 17–18, 2016.',
+        aboutTransportedHtml:
+            '<span class="narrative-term">Transported</span> — Modeled flood depths if the 2016 Tax Day Storm were centered on the Huntings Bayou landscape.',
         historicTileUrl:
             "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/Resampled_Huntings_Historical_Depths/MapServer",
         transportedTileUrl:
@@ -1167,9 +1179,6 @@ function setHomesEnabled(on) {
     if (homesPointLegend) {
         homesPointLegend.hidden = !on;
     }
-    if (homesFloodedStat) {
-        homesFloodedStat.hidden = !on;
-    }
     if (!on) {
         cancelHomesHoverPoll();
         hideHomesHoverPopup();
@@ -1193,6 +1202,8 @@ centroidsToggle.addEventListener("click", () => {
 });
 
 setHomesEnabled(true);
+
+syncAboutComparisonNarrative(currentWatershedId);
 
 function applyFloodOpacityFromSlider() {
     if (!opacitySlider || !overlayLayers?.historic || !overlayLayers?.transported) {
@@ -1295,9 +1306,6 @@ function applyWatershedUiState(wsId) {
     if (homesPointLegend) {
         homesPointLegend.hidden = !s.homesVisible;
     }
-    if (homesFloodedStat) {
-        homesFloodedStat.hidden = !s.homesVisible;
-    }
 
     applyRasterScenario(s.scenario);
     applyFloodOpacityFromSlider();
@@ -1311,6 +1319,25 @@ function updateWatershedPickerUi() {
         btn.classList.toggle("is-active", active);
         btn.setAttribute("aria-pressed", String(active));
     });
+}
+
+function syncAboutComparisonNarrative(wsId) {
+    const def = WATERSHED_DEFS[wsId];
+    if (!def) {
+        return;
+    }
+    const lede = document.getElementById("about-comparison-lede");
+    const liH = document.getElementById("about-comparison-historic");
+    const liT = document.getElementById("about-comparison-transported");
+    if (lede && def.aboutLede != null) {
+        lede.textContent = def.aboutLede;
+    }
+    if (liH && def.aboutHistoricHtml != null) {
+        liH.innerHTML = def.aboutHistoricHtml;
+    }
+    if (liT && def.aboutTransportedHtml != null) {
+        liT.innerHTML = def.aboutTransportedHtml;
+    }
 }
 
 async function switchWatershed(newId) {
@@ -1328,6 +1355,7 @@ async function switchWatershed(newId) {
     refreshFloodRasterTiles();
     rebindCentroidsLayerView();
     updateWatershedPickerUi();
+    syncAboutComparisonNarrative(newId);
     window.overlayLayers = overlayLayers;
     window.currentWatershedId = newId;
 

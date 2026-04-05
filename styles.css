@@ -42,20 +42,10 @@ html, body, #viewDiv {
     min-width: 0;
 }
 
-.sidebar-kicker {
-    display: block;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #6b6358;
-    margin-bottom: 4px;
-}
-
 #sidebar-header h1 {
     font-size: 17px;
     line-height: 1.25;
-    margin: 0;
+    margin: 0 0 10px;
     color: #1e1c18;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -82,6 +72,42 @@ html, body, #viewDiv {
 
 .map-embed-widgets--top-left > * {
     pointer-events: auto;
+}
+
+.sidebar-title-block .watershed-picker {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.watershed-btn {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    padding: 8px 10px;
+    border: 2px solid #d8d4cc;
+    border-radius: 6px;
+    background: #faf9f6;
+    color: #1e1c18;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.watershed-btn:hover {
+    border-color: #b8a99a;
+    background: #fff;
+}
+
+.watershed-btn.is-active {
+    border-color: #2d6a8f;
+    background: #f0f8fc;
+    box-shadow: 0 0 0 1px rgba(45, 106, 143, 0.25);
 }
 
 #viewDiv {

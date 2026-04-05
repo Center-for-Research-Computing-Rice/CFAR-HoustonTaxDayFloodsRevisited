@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tax Day Flood Revisited — Clear Creek</title>
+    <title>Houston Tax Day Flood Revisited</title>
 
     <!-- Drop stale service workers on this origin (they often break ArcGIS CDN with opaque FetchEvent responses). Omit if you ship your own PWA. -->
     <script>
@@ -29,8 +29,27 @@
         <div id="sidebar">
             <div id="sidebar-header">
                 <div class="sidebar-title-block">
-                    <span class="sidebar-kicker">Houston · Clear Creek</span>
-                    <h1>Tax Day Flood Revisited</h1>
+                    <h1>Houston Tax Day Flood Revisited</h1>
+                    <div class="watershed-picker" role="group" aria-label="Watershed">
+                        <button
+                            type="button"
+                            class="watershed-btn is-active"
+                            data-watershed="clear-creek"
+                            aria-pressed="true"
+                            title="Clear Creek watershed"
+                        >
+                            Clear Creek
+                        </button>
+                        <button
+                            type="button"
+                            class="watershed-btn"
+                            data-watershed="huntings-bayou"
+                            aria-pressed="false"
+                            title="Huntings Bayou watershed"
+                        >
+                            Huntings Bayou
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -97,7 +116,7 @@
                     <div id="depth-filter-control">
                         <label
                             for="depth-filter-slider"
-                            title="Minimum modeled depth (0–10 ft) kept on the flood raster and used for the flooded-home count. Raster colors use a blue ramp compressed so saturation is reached by ~2 ft modeled depth."
+                            title="Minimum modeled depth (≥ threshold) kept on the flood raster and used for the flooded-home count (range depends on watershed, from layer legend). Raster colors use a ramp compressed so saturation is reached by ~2 ft modeled depth."
                             >Depth filter</label
                         >
                         <div id="depth-filter-container">
@@ -201,6 +220,7 @@
                                 <option value="tropical-azure">Tropical azure</option>
                                 <option value="slate-tide">Slate tide</option>
                                 <option value="seafoam-mist">Seafoam mist</option>
+                                <option value="cyan-magenta">Cyan to magenta (pink extreme)</option>
                             </select>
                         </div>
                     </div>

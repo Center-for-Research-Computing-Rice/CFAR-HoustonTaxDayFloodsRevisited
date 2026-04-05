@@ -11,7 +11,8 @@ const [
     Basemap,
     Viewpoint,
     reactiveUtils,
-    FeatureFilter
+    FeatureFilter,
+    Extent
 ] = await $arcgis.import([
     "@arcgis/core/Map.js",
     "@arcgis/core/views/MapView.js",
@@ -21,22 +22,91 @@ const [
     "@arcgis/core/Basemap.js",
     "@arcgis/core/Viewpoint.js",
     "@arcgis/core/core/reactiveUtils.js",
-    "@arcgis/core/layers/support/FeatureFilter.js"
+    "@arcgis/core/layers/support/FeatureFilter.js",
+    "@arcgis/core/geometry/Extent.js"
 ]);
 
-const homePosition = { longitude: -95.1410888, latitude: 29.6014573 };
-const homeZoom = 12;
-const centroidServiceUrl = "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0";
-const historicFloodServiceUrl =
-    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_BW/MapServer";
-const transportedFloodServiceUrl =
-    "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_BW/MapServer";
+/**
+ * When `.../MapServer/legend?f=json` has no parseable stretch label, assume this data range (ft).
+ * Stretched BW tiles: white → min, black → max (same convention as ArcGIS raster export).
+ */
+const FLOOD_RASTER_DATA_RANGE_FALLBACK_FT = { minFt: 0, maxFt: 10 };
 
-/** Grayscale tile → feet for filtering / alignment with modeled depths (black = this depth). */
-const FLOOD_RASTER_DATA_MAX_DEPTH_FT = 10;
-
-/** Raster color ramp compresses to this depth; ≥ this depth uses the darkest blue. */
+/** Raster color ramp compresses to this depth; ≥ this depth uses the deepest ramp color. */
 const FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT = 2;
+
+/**
+ * @param {unknown} legendJson Response from `.../MapServer/legend?f=json`
+ * @param {number} [layerId=0]
+ * @returns {{ minFt: number, maxFt: number } | null}
+ */
+function parseFloodRasterDepthRangeFromLegend(legendJson, layerId = 0) {
+    const layers = legendJson?.layers;
+    if (!Array.isArray(layers)) {
+        return null;
+    }
+    const layer = layers.find((l) => l.id === layerId) ?? layers[0];
+    const leg = layer?.legend;
+    if (!Array.isArray(leg) || leg.length === 0) {
+        return null;
+    }
+    const label = leg[0]?.label;
+    if (typeof label !== "string") {
+        return null;
+    }
+    const parts = label.split(/\s*-\s*/).map((s) => Number.parseFloat(String(s).trim()));
+    if (parts.length < 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) {
+        return null;
+    }
+    const a = parts[0];
+    const b = parts[1];
+    const minFt = Math.min(a, b);
+    const maxFt = Math.max(a, b);
+    if (!(maxFt > minFt)) {
+        return null;
+    }
+    return { minFt, maxFt };
+}
+
+function resolveFloodRasterDataRangeFt(legendJson, layerId = 0) {
+    const parsed = parseFloodRasterDepthRangeFromLegend(legendJson, layerId);
+    if (parsed) {
+        return parsed;
+    }
+    return { ...FLOOD_RASTER_DATA_RANGE_FALLBACK_FT };
+}
+
+/** Static config per watershed (URLs, attribute fields, optional fixed home view). */
+const WATERSHED_DEFS = {
+    "clear-creek": {
+        id: "clear-creek",
+        label: "Clear Creek",
+        historicTileUrl:
+            "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_historic_HC_CC_BW/MapServer",
+        transportedTileUrl:
+            "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/TD_transposed_HC_CC_BW/MapServer",
+        centroidUrl:
+            "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/res_centriods_HC_CC/FeatureServer/0",
+        historicField: "TD_histori",
+        transportedField: "TD_transpo",
+        homeCenter: { longitude: -95.1410888, latitude: 29.6014573 },
+        homeZoom: 12
+    },
+    "huntings-bayou": {
+        id: "huntings-bayou",
+        label: "Huntings Bayou",
+        historicTileUrl:
+            "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/Resampled_Huntings_Historical_Depths/MapServer",
+        transportedTileUrl:
+            "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/Resample_Huntings_Transported_Depths/MapServer",
+        centroidUrl:
+            "https://services.arcgis.com/lqRTrQp2HrfnJt8U/arcgis/rest/services/HC_Res_Centriods_BG_HB/FeatureServer/0",
+        historicField: "HTD_dep_HB",
+        transportedField: "TDT_dep_HB",
+        homeCenter: null,
+        homeZoom: null
+    }
+};
 
 /**
  * Water-themed display ramps (t = 0 shallow … 1 deep on the compressed color scale).
@@ -108,6 +178,17 @@ const FLOOD_RASTER_RAMPS = {
             { t: 0.8, r: 15, g: 105, b: 130 },
             { t: 1, r: 8, g: 62, b: 82 }
         ]
+    },
+    "cyan-magenta": {
+        label: "Cyan to magenta (pink extreme)",
+        stops: [
+            { t: 0, r: 204, g: 255, b: 255 },
+            { t: 0.2, r: 102, g: 217, b: 255 },
+            { t: 0.4, r: 0, g: 153, b: 255 },
+            { t: 0.6, r: 0, g: 71, b: 178 },
+            { t: 0.8, r: 90, g: 40, b: 195 },
+            { t: 1, r: 245, g: 35, b: 245 }
+        ]
     }
 };
 
@@ -142,6 +223,45 @@ function floodDepthDisplayRgbFromNorm(t, stops = getFloodRasterDisplayStops()) {
         }
     }
     return { r: lastStop.r, g: lastStop.g, b: lastStop.b };
+}
+
+function rgbToHex(r, g, b) {
+    const h = (n) =>
+        Math.max(0, Math.min(255, Math.round(Number(n) || 0)))
+            .toString(16)
+            .padStart(2, "0");
+    return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/** Mid-depth (ft) per legend band on the 0–2 ft compressed color scale (matches raster t = depth / cap). */
+const FLOOD_LEGEND_SWATCH_DEPTH_MID_FT = {
+    nuisance: 0.25,
+    danger: 0.75,
+    major: 1.55,
+    extreme: 2
+};
+
+/** Updates #flood-legend swatches to match `currentFloodRasterRampId`. */
+function syncFloodLegendSwatches() {
+    const root = document.getElementById("flood-legend");
+    if (!root) {
+        return;
+    }
+    const stops = getFloodRasterDisplayStops();
+    const cap = FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT;
+    const noneEl = root.querySelector('.legend-item[data-depth-class="none"] .legend-color');
+    if (noneEl) {
+        noneEl.style.backgroundColor = "#ffffff";
+    }
+    for (const [cls, midFt] of Object.entries(FLOOD_LEGEND_SWATCH_DEPTH_MID_FT)) {
+        const el = root.querySelector(`.legend-item[data-depth-class="${cls}"] .legend-color`);
+        if (!el) {
+            continue;
+        }
+        const t = Math.min(1, midFt / cap);
+        const { r, g, b } = floodDepthDisplayRgbFromNorm(t, stops);
+        el.style.backgroundColor = rgbToHex(r, g, b);
+    }
 }
 
 function getFloodColor(depth) {
@@ -270,12 +390,34 @@ function estimatedDepthFromLegendSamples(r, g, b, samples) {
     return (bestFt * w1 + secondFt * w2) / (w1 + w2);
 }
 
-/** BW tiles: white = shallow, black = deep; filter uses data ft, colors use cap at FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT. */
-function processBwFloodTileToBlue(imageData, minDepthFt) {
+/**
+ * Same 0.1 ft grid as the depth slider / centroid SQL so raster cutoff matches ≥ semantics
+ * (raw float compare vs 8‑bit luminance often feels like strict >).
+ */
+function depthPassesMinFilterFt(depthDataFt, minDepthFt) {
+    const minD = Math.max(0, Number(minDepthFt) || 0);
+    if (minD <= 0) {
+        return true;
+    }
+    const d = Math.max(0, Number(depthDataFt) || 0);
+    const dQ = Math.round(d * 10) / 10;
+    const minQ = Math.round(minD * 10) / 10;
+    return dQ >= minQ;
+}
+
+/**
+ * BW tiles: white = data min depth, black = data max (ArcGIS stretch).
+ * `dataMinFt` / `dataMaxFt` come from the layer’s MapServer legend when available.
+ */
+function processBwFloodTileToBlue(imageData, minDepthFt, dataMinFt, dataMaxFt) {
     const data = imageData.data;
     const len = data.length;
     const minD = Math.max(0, Number(minDepthFt) || 0);
-    const dataMax = FLOOD_RASTER_DATA_MAX_DEPTH_FT;
+    const dMin = Number(dataMinFt);
+    const dMax = Number(dataMaxFt);
+    const rangeMin = Number.isFinite(dMin) ? dMin : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.minFt;
+    const rangeMax = Number.isFinite(dMax) ? dMax : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.maxFt;
+    const dataSpan = Math.max(1e-6, rangeMax - rangeMin);
     const colorCap = Math.max(1e-6, FLOOD_COLOR_DISPLAY_MAX_DEPTH_FT);
     const stops = getFloodRasterDisplayStops();
 
@@ -288,9 +430,9 @@ function processBwFloodTileToBlue(imageData, minDepthFt) {
         const b = data[i + 2];
         const lum = (r + g + b) / 3;
         const depthNorm = (255 - lum) / 255;
-        const depthDataFt = depthNorm * dataMax;
+        const depthDataFt = rangeMin + depthNorm * dataSpan;
 
-        if (minD > 0 && depthDataFt + 1e-6 < minD) {
+        if (!depthPassesMinFilterFt(depthDataFt, minD)) {
             data[i + 3] = 0;
             continue;
         }
@@ -366,6 +508,9 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         spatialReference,
         fullExtent,
         tileInfo,
+        /** From MapServer legend stretch (ft); drives luminance → depth. */
+        floodDataMinFt,
+        floodDataMaxFt,
         ...layerOptions
     }) {
         super({
@@ -380,6 +525,8 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
         this._legendDepthSamples = legendDepthSamples ?? [];
         this._tileRgbMode = tileRgbMode;
         this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
+        this.floodDataMinFt = floodDataMinFt ?? FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.minFt;
+        this.floodDataMaxFt = floodDataMaxFt ?? FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.maxFt;
     }
 
     getEmptyTileCanvas() {
@@ -440,7 +587,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                 const legend = this._legendDepthSamples;
                 if (this._tileRgbMode === "bwBlue") {
                     const imageData = ctx.getImageData(0, 0, w, h);
-                    processBwFloodTileToBlue(imageData, minDepth);
+                    processBwFloodTileToBlue(imageData, minDepth, this.floodDataMinFt, this.floodDataMaxFt);
                     ctx.putImageData(imageData, 0, 0);
                 } else if (minDepth > 0 && legend.length > 0) {
                     const imageData = ctx.getImageData(0, 0, w, h);
@@ -451,7 +598,7 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
                             continue;
                         }
                         const est = estimatedDepthFromLegendSamples(data[i], data[i + 1], data[i + 2], legend);
-                        if (est + 1e-6 < minDepth) {
+                        if (!depthPassesMinFilterFt(est, minDepth)) {
                             data[i + 3] = 0;
                         }
                     }
@@ -463,65 +610,137 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
     }
 }
 
-const [historicFloodMeta, transportedFloodMeta] = await Promise.all([
-    fetch(`${historicFloodServiceUrl}?f=json`).then((r) => r.json()),
-    fetch(`${transportedFloodServiceUrl}?f=json`).then((r) => r.json())
-]);
-
-const overlayLayers = {
-    historic: new DepthFilterFloodTileLayer({
-        tileServiceRoot: historicFloodServiceUrl,
+async function loadWatershedLayerPack(def) {
+    const hUrl = def.historicTileUrl.replace(/\/$/, "");
+    const tUrl = def.transportedTileUrl.replace(/\/$/, "");
+    const [metaH, metaT, legH, legT] = await Promise.all([
+        fetch(`${hUrl}?f=json`).then((r) => r.json()),
+        fetch(`${tUrl}?f=json`).then((r) => r.json()),
+        fetch(`${hUrl}/legend?f=json`).then((r) => r.json()),
+        fetch(`${tUrl}/legend?f=json`).then((r) => r.json())
+    ]);
+    const rangeH = resolveFloodRasterDataRangeFt(legH, 0);
+    const rangeT = resolveFloodRasterDataRangeFt(legT, 0);
+    const depthFilterMaxFt = Math.max(
+        1,
+        Math.ceil(Math.max(rangeH.maxFt, rangeT.maxFt, 1) * 10) / 10
+    );
+    const historic = new DepthFilterFloodTileLayer({
+        tileServiceRoot: hUrl,
         floodScenarioId: "historic",
         minDepthFt: 0,
         legendDepthSamples: [],
         tileRgbMode: "bwBlue",
-        spatialReference: historicFloodMeta.spatialReference,
-        fullExtent: historicFloodMeta.fullExtent,
-        tileInfo: historicFloodMeta.tileInfo,
+        spatialReference: metaH.spatialReference,
+        fullExtent: metaH.fullExtent,
+        tileInfo: metaH.tileInfo,
+        floodDataMinFt: rangeH.minFt,
+        floodDataMaxFt: rangeH.maxFt,
         opacity: 0.7,
-        visible: true
-    }),
-    transported: new DepthFilterFloodTileLayer({
-        tileServiceRoot: transportedFloodServiceUrl,
+        visible: false
+    });
+    const transported = new DepthFilterFloodTileLayer({
+        tileServiceRoot: tUrl,
         floodScenarioId: "transported",
         minDepthFt: 0,
         legendDepthSamples: [],
         tileRgbMode: "bwBlue",
-        spatialReference: transportedFloodMeta.spatialReference,
-        fullExtent: transportedFloodMeta.fullExtent,
-        tileInfo: transportedFloodMeta.tileInfo,
+        spatialReference: metaT.spatialReference,
+        fullExtent: metaT.fullExtent,
+        tileInfo: metaT.tileInfo,
+        floodDataMinFt: rangeT.minFt,
+        floodDataMaxFt: rangeT.maxFt,
         opacity: 0.7,
         visible: false
-    }),
-    centroids: new FeatureLayer({
-        url: centroidServiceUrl,
-        renderer: createCentroidRenderer(currentCentroidField),
-        visible: true,
+    });
+    const centroids = new FeatureLayer({
+        url: def.centroidUrl,
+        renderer: createCentroidRenderer(def.historicField),
+        visible: false,
         popupEnabled: false,
-        outFields: ["FID", "TD_histori", "TD_transpo"]
-    })
+        outFields: ["FID", def.historicField, def.transportedField]
+    });
+    let homeGoTo;
+    if (def.homeCenter != null && def.homeZoom != null) {
+        homeGoTo = {
+            center: [def.homeCenter.longitude, def.homeCenter.latitude],
+            zoom: def.homeZoom
+        };
+    } else {
+        const fe = metaH.fullExtent;
+        homeGoTo = {
+            target: new Extent({
+                xmin: fe.xmin,
+                ymin: fe.ymin,
+                xmax: fe.xmax,
+                ymax: fe.ymax,
+                spatialReference: fe.spatialReference || metaH.spatialReference
+            })
+        };
+    }
+    return {
+        def,
+        historic,
+        transported,
+        centroids,
+        depthFilterMaxFt,
+        homeGoTo
+    };
+}
+
+const [clearCreekPack, huntingsBayouPack] = await Promise.all([
+    loadWatershedLayerPack(WATERSHED_DEFS["clear-creek"]),
+    loadWatershedLayerPack(WATERSHED_DEFS["huntings-bayou"])
+]);
+
+const watershedLayerSets = {
+    "clear-creek": clearCreekPack,
+    "huntings-bayou": huntingsBayouPack
 };
 
+let currentWatershedId = "clear-creek";
+
+/** Active historic / transported / centroids (reassigned on watershed change). */
+let overlayLayers = {
+    historic: clearCreekPack.historic,
+    transported: clearCreekPack.transported,
+    centroids: clearCreekPack.centroids
+};
+
+const ccHome = WATERSHED_DEFS["clear-creek"].homeCenter;
 const map = new ArcGISMap({
     basemap: createBasemap("cartodb-positron"),
-    layers: [overlayLayers.historic, overlayLayers.transported, overlayLayers.centroids]
+    layers: [
+        clearCreekPack.historic,
+        clearCreekPack.transported,
+        clearCreekPack.centroids,
+        huntingsBayouPack.historic,
+        huntingsBayouPack.transported,
+        huntingsBayouPack.centroids
+    ]
 });
 
 const view = new MapView({
     container: "viewDiv",
     map,
-    center: [homePosition.longitude, homePosition.latitude],
-    zoom: homeZoom
+    center: [ccHome.longitude, ccHome.latitude],
+    zoom: WATERSHED_DEFS["clear-creek"].homeZoom
 });
 
 await view.when();
 
 /** Client-side attribute filter (avoids server round-trips on each depth change). */
 let centroidsLayerView = null;
-view.whenLayerView(overlayLayers.centroids).then((lv) => {
-    centroidsLayerView = lv;
-    syncCentroidsLayerViewFilter();
-});
+
+function rebindCentroidsLayerView() {
+    centroidsLayerView = null;
+    void view.whenLayerView(overlayLayers.centroids).then((lv) => {
+        centroidsLayerView = lv;
+        syncCentroidsLayerViewFilter();
+    });
+}
+
+rebindCentroidsLayerView();
 
 const homesHoverPopup = document.getElementById("homes-hover-popup");
 
@@ -597,8 +816,9 @@ function positionHomesHoverPopup(screenX, screenY) {
 
 function showHomesHoverPopup(screenX, screenY, attrs) {
     if (!homesHoverPopup) return;
-    const historic = attrs?.TD_histori;
-    const transportedDepth = attrs?.TD_transpo;
+    const wdef = WATERSHED_DEFS[currentWatershedId];
+    const historic = attrs?.[wdef.historicField];
+    const transportedDepth = attrs?.[wdef.transportedField];
     homesHoverPopup.innerHTML = buildHomesHoverContent(historic, transportedDepth);
     homesHoverPopup.hidden = false;
     homesHoverPopup.setAttribute("aria-hidden", "false");
@@ -773,7 +993,7 @@ function formatDepthFilterReadout(minFt) {
     if (v <= 0) {
         return "Any depth";
     }
-    return `> ${v.toFixed(1)} ft`;
+    return `≥ ${v.toFixed(1)} ft`;
 }
 
 function syncDepthFilterReadout(minFt) {
@@ -787,21 +1007,23 @@ function syncHomesFloodedStatTitle(minFt) {
         return;
     }
     const v = quantizeDepthFilterFt(minFt);
-    const fieldLabel = currentCentroidField === "TD_transpo" ? "Transported" : "Historic";
+    const wdef = WATERSHED_DEFS[currentWatershedId];
+    const fieldLabel = currentCentroidField === wdef.transportedField ? "Transported" : "Historic";
     homesFloodedStat.title =
         v <= 0
-            ? `Server count for ${fieldLabel}: depth > 0 ft, excluding −9999.`
+            ? `Server count for ${fieldLabel}: depth ≥ 0 ft, excluding −9999.`
             : `Server count for ${fieldLabel}: depth ≥ ${v.toFixed(1)} ft (same floor as the depth-filtered raster), excluding −9999.`;
 }
 
 /** Same SQL as the homes layer filter and depth-filtered point display. */
 function buildCentroidDepthWhereClause() {
+    const wdef = WATERSHED_DEFS[currentWatershedId];
     const field = currentCentroidField;
-    if (field !== "TD_histori" && field !== "TD_transpo") {
+    if (field !== wdef.historicField && field !== wdef.transportedField) {
         return null;
     }
     const minFt = getFloodMinDepthFt();
-    const depthPredicate = minFt <= 0 ? `${field} > 0` : `${field} >= ${minFt}`;
+    const depthPredicate = minFt <= 0 ? `${field} >= 0` : `${field} >= ${minFt}`;
     return `${depthPredicate} AND ${field} <> -9999`;
 }
 
@@ -813,7 +1035,7 @@ function syncCentroidsLayerViewFilter() {
     centroidsLayerView.filter = clause ? new FeatureFilter({ where: clause }) : null;
 }
 
-/** Counts homes with depth &gt; min depth filter (same floor as the raster); excludes −9999. Field follows scenario / advanced point field. */
+/** Counts homes with depth ≥ min depth filter (same floor as the raster); excludes −9999. */
 async function refreshFloodedHomesCount() {
     if (!homesFloodedCountEl || !overlayLayers?.centroids) {
         return;
@@ -864,17 +1086,30 @@ function updateScenarioUI(selectedRaster) {
     }
 }
 
+function syncAllWatershedLayerVisibility() {
+    const homesOn = centroidsToggle?.getAttribute("aria-checked") === "true";
+    for (const id of Object.keys(watershedLayerSets)) {
+        const pack = watershedLayerSets[id];
+        const active = id === currentWatershedId;
+        if (!active) {
+            pack.historic.visible = false;
+            pack.transported.visible = false;
+            pack.centroids.visible = false;
+        } else {
+            pack.historic.visible = currentFloodLayer === "historic";
+            pack.transported.visible = currentFloodLayer === "transported";
+            pack.centroids.visible = !!homesOn;
+        }
+    }
+}
+
 function applyRasterScenario(selectedRaster) {
     currentFloodLayer = selectedRaster;
 
-    overlayLayers.historic.visible = selectedRaster === "historic";
-    overlayLayers.transported.visible = selectedRaster === "transported";
+    const wdef = WATERSHED_DEFS[currentWatershedId];
+    currentCentroidField = selectedRaster === "historic" ? wdef.historicField : wdef.transportedField;
 
-    if (selectedRaster === "historic") {
-        currentCentroidField = "TD_histori";
-    } else {
-        currentCentroidField = "TD_transpo";
-    }
+    syncAllWatershedLayerVisibility();
 
     updateScenarioUI(selectedRaster);
 
@@ -887,8 +1122,11 @@ function applyRasterScenario(selectedRaster) {
 }
 
 function refreshFloodRasterTiles() {
-    overlayLayers?.historic?.refresh?.();
-    overlayLayers?.transported?.refresh?.();
+    for (const id of Object.keys(watershedLayerSets)) {
+        const pack = watershedLayerSets[id];
+        pack.historic.refresh?.();
+        pack.transported.refresh?.();
+    }
 }
 
 function applyFloodRasterRamp(rampId) {
@@ -900,6 +1138,7 @@ function applyFloodRasterRamp(rampId) {
         floodRampDropdown.value = rampId;
     }
     refreshFloodRasterTiles();
+    syncFloodLegendSwatches();
 }
 
 basemapDropdown.addEventListener("change", (event) => {
@@ -912,6 +1151,7 @@ if (floodRampDropdown) {
     });
     floodRampDropdown.value = currentFloodRasterRampId;
 }
+syncFloodLegendSwatches();
 
 scenarioButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -922,7 +1162,6 @@ scenarioButtons.forEach((btn) => {
 applyRasterScenario("historic");
 
 function setHomesEnabled(on) {
-    overlayLayers.centroids.visible = on;
     centroidsToggle.setAttribute("aria-checked", String(on));
     centroidsToggle.classList.toggle("is-active", on);
     if (homesPointLegend) {
@@ -938,6 +1177,7 @@ function setHomesEnabled(on) {
             view.container.style.cursor = "";
         }
     }
+    syncAllWatershedLayerVisibility();
     if (on) {
         overlayLayers.centroids.renderer = createCentroidRenderer(currentCentroidField);
         syncCentroidsLayerViewFilter();
@@ -976,8 +1216,13 @@ if (opacitySlider) {
     queueMicrotask(() => applyFloodOpacityFromSlider());
 }
 
+function getActiveDepthFilterMaxFt() {
+    return watershedLayerSets[currentWatershedId]?.depthFilterMaxFt ?? 10;
+}
+
 function applyFloodMinDepthFt(minFt) {
-    const v = quantizeDepthFilterFt(minFt);
+    const maxFt = getActiveDepthFilterMaxFt();
+    const v = Math.min(quantizeDepthFilterFt(minFt), maxFt);
     overlayLayers.historic.minDepthFt = v;
     overlayLayers.transported.minDepthFt = v;
     if (depthFilterSlider) {
@@ -995,11 +1240,114 @@ function applyFloodMinDepthFt(minFt) {
 
 if (depthFilterSlider && depthFilterValue) {
     depthFilterSlider.addEventListener("input", (event) => {
-        const v = quantizeDepthFilterFt(event.target.value);
+        const maxFt = getActiveDepthFilterMaxFt();
+        const raw = quantizeDepthFilterFt(event.target.value);
+        const v = Math.min(raw, maxFt);
         applyFloodMinDepthFt(v);
     });
     syncDepthFilterReadout(quantizeDepthFilterFt(depthFilterSlider.value));
 }
+
+function defaultWatershedUiState() {
+    return {
+        scenario: "historic",
+        opacityTransparency: 30,
+        depthFilterFt: 0,
+        homesVisible: true
+    };
+}
+
+const watershedUiState = {
+    "clear-creek": defaultWatershedUiState(),
+    "huntings-bayou": defaultWatershedUiState()
+};
+
+function captureWatershedUiState(wsId) {
+    watershedUiState[wsId] = {
+        scenario: currentFloodLayer,
+        opacityTransparency: Number.parseInt(opacitySlider?.value ?? "30", 10),
+        depthFilterFt: quantizeDepthFilterFt(depthFilterSlider?.value ?? 0),
+        homesVisible: centroidsToggle?.getAttribute("aria-checked") === "true"
+    };
+}
+
+function applyWatershedUiState(wsId) {
+    const s = watershedUiState[wsId];
+    const pack = watershedLayerSets[wsId];
+    if (depthFilterSlider) {
+        depthFilterSlider.max = String(pack.depthFilterMaxFt);
+    }
+    if (floodRampDropdown) {
+        floodRampDropdown.value = currentFloodRasterRampId;
+    }
+    if (opacitySlider) {
+        opacitySlider.value = String(Number.isFinite(s.opacityTransparency) ? s.opacityTransparency : 30);
+    }
+    const maxD = pack.depthFilterMaxFt;
+    const d = Math.min(quantizeDepthFilterFt(s.depthFilterFt), maxD);
+    if (depthFilterSlider) {
+        depthFilterSlider.value = String(d);
+    }
+    syncDepthFilterReadout(d);
+
+    centroidsToggle?.setAttribute("aria-checked", String(s.homesVisible));
+    centroidsToggle?.classList.toggle("is-active", s.homesVisible);
+    if (homesPointLegend) {
+        homesPointLegend.hidden = !s.homesVisible;
+    }
+    if (homesFloodedStat) {
+        homesFloodedStat.hidden = !s.homesVisible;
+    }
+
+    applyRasterScenario(s.scenario);
+    applyFloodOpacityFromSlider();
+    applyFloodMinDepthFt(d);
+    syncFloodLegendSwatches();
+}
+
+function updateWatershedPickerUi() {
+    document.querySelectorAll("[data-watershed]").forEach((btn) => {
+        const active = btn.dataset.watershed === currentWatershedId;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", String(active));
+    });
+}
+
+async function switchWatershed(newId) {
+    if (newId === currentWatershedId || !watershedLayerSets[newId]) {
+        return;
+    }
+    captureWatershedUiState(currentWatershedId);
+    currentWatershedId = newId;
+    overlayLayers = {
+        historic: watershedLayerSets[newId].historic,
+        transported: watershedLayerSets[newId].transported,
+        centroids: watershedLayerSets[newId].centroids
+    };
+    applyWatershedUiState(newId);
+    refreshFloodRasterTiles();
+    rebindCentroidsLayerView();
+    updateWatershedPickerUi();
+    window.overlayLayers = overlayLayers;
+    window.currentWatershedId = newId;
+
+    const pack = watershedLayerSets[newId];
+    try {
+        await view.goTo(pack.homeGoTo, { duration: 1100 });
+    } catch {
+        /* ignore goTo abort */
+    }
+    const homeEl = document.getElementById("arcgis-home-widget");
+    if (homeEl && typeof view.viewpoint?.clone === "function") {
+        homeEl.viewpoint = view.viewpoint.clone();
+    }
+}
+
+document.querySelectorAll("[data-watershed]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        void switchWatershed(btn.dataset.watershed);
+    });
+});
 
 controlsToggle.addEventListener("click", () => {
     controlsContent.classList.toggle("collapsed");
@@ -1134,6 +1482,7 @@ window.arcgisMap = map;
 window.arcgisView = view;
 window.overlayLayers = overlayLayers;
 window.currentFloodLayer = currentFloodLayer;
+window.currentWatershedId = currentWatershedId;
 window.getFloodColor = getFloodColor;
 
 console.log("ArcGIS JavaScript API v5 map initialized for Houston, Texas");

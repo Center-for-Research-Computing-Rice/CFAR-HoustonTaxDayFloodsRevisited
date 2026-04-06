@@ -556,6 +556,36 @@ function envelopesIntersect(a, b) {
     return a.xmin < b.xmax && a.xmax > b.xmin && a.ymin < b.ymax && a.ymax > b.ymin;
 }
 
+/**
+ * MapServer `tileInfo.lods` often lists levels beyond what is cached (`minLOD` / `maxLOD`).
+ * Without clipping, the view can request tiles that 404 (e.g. Clear Creek transported max 19 vs historic 20).
+ */
+function effectiveMapServerLODRange(meta) {
+    const lods = meta?.tileInfo?.lods;
+    if (!lods?.length) {
+        return { min: 0, max: 0 };
+    }
+    const levels = lods.map((l) => l.level);
+    const minFromLods = Math.min(...levels);
+    const maxFromLods = Math.max(...levels);
+    const min = Number.isFinite(meta.minLOD) ? meta.minLOD : minFromLods;
+    const max = Number.isFinite(meta.maxLOD) ? meta.maxLOD : maxFromLods;
+    return { min, max };
+}
+
+function clipTileInfoLods(tileInfo, minLOD, maxLOD) {
+    if (!tileInfo?.lods?.length) {
+        return tileInfo;
+    }
+    const minL = Number.isFinite(minLOD) ? minLOD : 0;
+    const maxL = Number.isFinite(maxLOD) ? maxLOD : Math.max(...tileInfo.lods.map((lod) => lod.level));
+    const lods = tileInfo.lods.filter((lod) => lod.level >= minL && lod.level <= maxL);
+    if (lods.length === tileInfo.lods.length) {
+        return tileInfo;
+    }
+    return { ...tileInfo, lods };
+}
+
 function resolutionForTileLevel(tileInfo, level) {
     const lods = tileInfo?.lods;
     if (!lods?.length) {
@@ -861,6 +891,13 @@ async function loadWatershedLayerPack(def) {
         1,
         Math.ceil(Math.max(rangeH.maxFt, rangeT.maxFt, 1) * 10) / 10
     );
+    const hLod = effectiveMapServerLODRange(metaH);
+    const tLod = effectiveMapServerLODRange(metaT);
+    const historicTileInfo = clipTileInfoLods(metaH.tileInfo, hLod.min, hLod.max);
+    const transportedTileInfo = clipTileInfoLods(metaT.tileInfo, tLod.min, tLod.max);
+    const diffMin = Math.max(hLod.min, tLod.min);
+    const diffMax = Math.min(hLod.max, tLod.max);
+    const differenceTileInfo = clipTileInfoLods(metaH.tileInfo, diffMin, diffMax);
     const historic = new DepthFilterFloodTileLayer({
         tileServiceRoot: hUrl,
         floodScenarioId: "historic",
@@ -869,7 +906,7 @@ async function loadWatershedLayerPack(def) {
         tileRgbMode: "bwBlue",
         spatialReference: metaH.spatialReference,
         fullExtent: metaH.fullExtent,
-        tileInfo: metaH.tileInfo,
+        tileInfo: historicTileInfo,
         floodDataMinFt: rangeH.minFt,
         floodDataMaxFt: rangeH.maxFt,
         opacity: 0.7,
@@ -883,7 +920,7 @@ async function loadWatershedLayerPack(def) {
         tileRgbMode: "bwBlue",
         spatialReference: metaT.spatialReference,
         fullExtent: metaT.fullExtent,
-        tileInfo: metaT.tileInfo,
+        tileInfo: transportedTileInfo,
         floodDataMinFt: rangeT.minFt,
         floodDataMaxFt: rangeT.maxFt,
         opacity: 0.7,
@@ -896,7 +933,7 @@ async function loadWatershedLayerPack(def) {
         minDepthFt: 0,
         spatialReference: metaH.spatialReference,
         fullExtent: metaH.fullExtent,
-        tileInfo: metaH.tileInfo,
+        tileInfo: differenceTileInfo,
         floodHistoricMinFt: rangeH.minFt,
         floodHistoricMaxFt: rangeH.maxFt,
         floodTransportedMinFt: rangeT.minFt,
@@ -1454,6 +1491,7 @@ function applyRasterScenario(selectedRaster) {
     }
     syncCentroidsLayerViewFilter();
     void refreshFloodedHomesCount();
+    refreshFloodRasterTiles();
 }
 
 function refreshFloodRasterTiles() {

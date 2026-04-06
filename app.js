@@ -96,7 +96,7 @@ const WATERSHED_DEFS = {
         historicField: "TD_histori",
         transportedField: "TD_transpo",
         homeCenter: { longitude: -95.1410888, latitude: 29.6014573 },
-        homeZoom: 13
+        homeZoom: 12.5
     },
     "hunting-bayou": {
         id: "hunting-bayou",
@@ -116,7 +116,7 @@ const WATERSHED_DEFS = {
         historicField: "HTD_dep_HB",
         transportedField: "TDT_dep_HB",
         homeCenter: null,
-        homeZoom: 14
+        homeZoom: 13.3
     }
 };
 
@@ -911,22 +911,37 @@ async function loadWatershedLayerPack(def) {
         popupEnabled: false,
         outFields: ["FID", def.historicField, def.transportedField]
     });
+    const fe = metaH.fullExtent;
+    const fullExtentGeom =
+        fe != null
+            ? new Extent({
+                  xmin: fe.xmin,
+                  ymin: fe.ymin,
+                  xmax: fe.xmax,
+                  ymax: fe.ymax,
+                  spatialReference: fe.spatialReference || metaH.spatialReference
+              })
+            : null;
+
     let homeGoTo;
     if (def.homeCenter != null && def.homeZoom != null) {
         homeGoTo = {
             center: [def.homeCenter.longitude, def.homeCenter.latitude],
             zoom: def.homeZoom
         };
-    } else {
-        const fe = metaH.fullExtent;
+    } else if (fullExtentGeom != null && def.homeZoom != null) {
+        // No explicit homeCenter: center on raster extent but honor homeZoom (e.g. Hunting Bayou).
         homeGoTo = {
-            target: new Extent({
-                xmin: fe.xmin,
-                ymin: fe.ymin,
-                xmax: fe.xmax,
-                ymax: fe.ymax,
-                spatialReference: fe.spatialReference || metaH.spatialReference
-            })
+            target: fullExtentGeom.center,
+            zoom: def.homeZoom
+        };
+    } else if (fullExtentGeom != null) {
+        homeGoTo = { target: fullExtentGeom };
+    } else {
+        const fallback = WATERSHED_DEFS["clear-creek"].homeCenter;
+        homeGoTo = {
+            center: [fallback.longitude, fallback.latitude],
+            zoom: WATERSHED_DEFS["clear-creek"].homeZoom
         };
     }
     return {
@@ -979,7 +994,11 @@ const view = new MapView({
     container: "viewDiv",
     map,
     center: [ccHome.longitude, ccHome.latitude],
-    zoom: WATERSHED_DEFS["clear-creek"].homeZoom
+    zoom: WATERSHED_DEFS["clear-creek"].homeZoom,
+    // Default snapToZoom rounds zoom to integer LODs; false allows 13.5, 14.5, etc. for goTo / homeZoom.
+    constraints: {
+        snapToZoom: false
+    }
 });
 
 await view.when();

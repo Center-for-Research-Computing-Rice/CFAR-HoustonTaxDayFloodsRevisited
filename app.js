@@ -96,17 +96,17 @@ const WATERSHED_DEFS = {
         historicField: "TD_histori",
         transportedField: "TD_transpo",
         homeCenter: { longitude: -95.1410888, latitude: 29.6014573 },
-        homeZoom: 12
+        homeZoom: 13
     },
-    "huntings-bayou": {
-        id: "huntings-bayou",
-        label: "Huntings Bayou",
+    "hunting-bayou": {
+        id: "hunting-bayou",
+        label: "Hunting Bayou",
         aboutLede:
-            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Huntings Bayou watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Huntings Bayou area, instead of outer Houston. Below: three map scenarios—Historic, Transported, and Difference.",
+            "In April 2016, the Tax Day Storm brought historic flooding to parts of the Houston region, mostly on the outer fringe. This map compares the actual flood impacts in the Hunting Bayou watershed with the impacts the 2016 Tax Day Storm would have had, if it centered over the Hunting Bayou area, instead of outer Houston. Below: three map scenarios—Historic, Transported, and Difference.",
         aboutHistoricHtml:
             '<span class="narrative-term">Historic</span> — Flood depths for this area during the actual Tax Day Storm of April 17–18, 2016.',
         aboutTransportedHtml:
-            '<span class="narrative-term">Transported</span> — Modeled flood depths if the 2016 Tax Day Storm were centered on the Huntings Bayou landscape.',
+            '<span class="narrative-term">Transported</span> — Modeled flood depths if the 2016 Tax Day Storm were centered on the Hunting Bayou landscape.',
         historicTileUrl:
             "https://tiles.arcgis.com/tiles/lqRTrQp2HrfnJt8U/arcgis/rest/services/Resampled_Huntings_Historical_Depths/MapServer",
         transportedTileUrl:
@@ -116,7 +116,7 @@ const WATERSHED_DEFS = {
         historicField: "HTD_dep_HB",
         transportedField: "TDT_dep_HB",
         homeCenter: null,
-        homeZoom: null
+        homeZoom: 14
     }
 };
 
@@ -940,14 +940,14 @@ async function loadWatershedLayerPack(def) {
     };
 }
 
-const [clearCreekPack, huntingsBayouPack] = await Promise.all([
+const [clearCreekPack, huntingBayouPack] = await Promise.all([
     loadWatershedLayerPack(WATERSHED_DEFS["clear-creek"]),
-    loadWatershedLayerPack(WATERSHED_DEFS["huntings-bayou"])
+    loadWatershedLayerPack(WATERSHED_DEFS["hunting-bayou"])
 ]);
 
 const watershedLayerSets = {
     "clear-creek": clearCreekPack,
-    "huntings-bayou": huntingsBayouPack
+    "hunting-bayou": huntingBayouPack
 };
 
 let currentWatershedId = "clear-creek";
@@ -968,10 +968,10 @@ const map = new ArcGISMap({
         clearCreekPack.transported,
         clearCreekPack.difference,
         clearCreekPack.centroids,
-        huntingsBayouPack.historic,
-        huntingsBayouPack.transported,
-        huntingsBayouPack.difference,
-        huntingsBayouPack.centroids
+        huntingBayouPack.historic,
+        huntingBayouPack.transported,
+        huntingBayouPack.difference,
+        huntingBayouPack.centroids
     ]
 });
 
@@ -1580,7 +1580,7 @@ function defaultWatershedUiState() {
 
 const watershedUiState = {
     "clear-creek": defaultWatershedUiState(),
-    "huntings-bayou": defaultWatershedUiState()
+    "hunting-bayou": defaultWatershedUiState()
 };
 
 function captureWatershedUiState(wsId) {

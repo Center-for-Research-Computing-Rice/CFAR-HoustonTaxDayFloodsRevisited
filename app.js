@@ -639,7 +639,8 @@ class DepthFilterFloodTileLayer extends BaseTileLayer {
             spatialReference,
             fullExtent,
             tileInfo,
-            ...layerOptions
+            ...layerOptions,
+            maxScale: 0
         });
         this.tileServiceRoot = tileServiceRoot.replace(/\/$/, "");
         this.minDepthFt = minDepthFt ?? 0;
@@ -809,7 +810,8 @@ class DifferenceFloodTileLayer extends BaseTileLayer {
             spatialReference,
             fullExtent,
             tileInfo,
-            ...layerOptions
+            ...layerOptions,
+            maxScale: 0
         });
         this._hRoot = historicTileRoot.replace(/\/$/, "");
         this._tRoot = transportedTileRoot.replace(/\/$/, "");

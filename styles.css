@@ -769,22 +769,19 @@ html, body, #viewDiv {
     display: none;
 }
 
-#basemap-selector,
-#flood-ramp-selector {
+#basemap-selector {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-#basemap-selector label,
-#flood-ramp-selector label {
+#basemap-selector label {
     font-weight: 600;
     color: #333;
     font-size: 12px;
 }
 
-#basemap-dropdown,
-#flood-ramp-dropdown {
+#basemap-dropdown {
     padding: 5px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -794,13 +791,11 @@ html, body, #viewDiv {
     transition: border-color 0.2s;
 }
 
-#basemap-dropdown:hover,
-#flood-ramp-dropdown:hover {
+#basemap-dropdown:hover {
     border-color: #999;
 }
 
-#basemap-dropdown:focus,
-#flood-ramp-dropdown:focus {
+#basemap-dropdown:focus {
     outline: none;
     border-color: #0079c1;
     box-shadow: 0 0 0 3px rgba(0, 121, 193, 0.1);
@@ -918,6 +913,136 @@ html, body, #viewDiv {
     align-items: stretch;
     gap: 6px;
     pointer-events: auto;
+    overflow: visible;
+}
+
+/* Color ramp picker (gradient bars only) — bottom of flood legend */
+.flood-ramp-picker-root {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.flood-ramp-picker {
+    position: relative;
+    width: 100%;
+}
+
+.flood-ramp-picker__trigger {
+    display: block;
+    width: 100%;
+    padding: 3px;
+    margin: 0;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.flood-ramp-picker__trigger:hover {
+    border-color: rgba(0, 121, 193, 0.45);
+}
+
+.flood-ramp-picker__trigger:focus {
+    outline: none;
+    border-color: #0079c1;
+    box-shadow: 0 0 0 2px rgba(0, 121, 193, 0.2);
+}
+
+.flood-ramp-picker__trigger[aria-expanded="true"] {
+    border-color: #0079c1;
+}
+
+.flood-ramp-picker__trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.flood-ramp-picker__trigger-bar {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    height: 14px;
+    border-radius: 2px;
+    background-color: #ccc;
+    background-size: 100% 100%;
+}
+
+/* Points right when closed (menu opens to the right of the legend); flips when open */
+.flood-ramp-picker__chevron {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid rgba(44, 40, 32, 0.72);
+    transition: transform 0.18s ease;
+    transform-origin: 40% 50%;
+}
+
+.flood-ramp-picker__trigger[aria-expanded="true"] .flood-ramp-picker__chevron {
+    transform: rotate(180deg);
+}
+
+.flood-ramp-picker__menu {
+    position: absolute;
+    left: calc(100% + 20px);
+    right: auto;
+    top: auto;
+    bottom: 0;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    z-index: 220;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.14);
+    max-height: min(70vh, 340px);
+    overflow-y: auto;
+}
+
+.flood-ramp-picker__menu[hidden] {
+    display: none !important;
+}
+
+.flood-ramp-picker__option {
+    display: block;
+    width: 100%;
+    padding: 2px;
+    margin: 0;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.12s;
+}
+
+.flood-ramp-picker__option:hover,
+.flood-ramp-picker__option:focus {
+    outline: none;
+    border-color: rgba(0, 121, 193, 0.35);
+}
+
+.flood-ramp-picker__option[aria-selected="true"] {
+    border-color: #0079c1;
+}
+
+.flood-ramp-picker__option-bar {
+    display: block;
+    width: 100%;
+    height: 10px;
+    border-radius: 2px;
+    background-color: #ddd;
+    background-size: 100% 100%;
 }
 
 #flood-legend .flood-legend-header {

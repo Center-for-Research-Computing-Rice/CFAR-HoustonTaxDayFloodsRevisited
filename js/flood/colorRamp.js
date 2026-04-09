@@ -52,28 +52,6 @@ export const FLOOD_RASTER_RAMPS = {
             { t: 1, r: 0, g: 38, b: 88 }
         ]
     },
-    "slate-tide": {
-        label: "Slate tide",
-        stops: [
-            { t: 0, r: 235, g: 242, b: 248 },
-            { t: 0.2, r: 185, g: 205, b: 225 },
-            { t: 0.4, r: 110, g: 145, b: 180 },
-            { t: 0.6, r: 60, g: 100, b: 140 },
-            { t: 0.8, r: 35, g: 68, b: 98 },
-            { t: 1, r: 18, g: 38, b: 58 }
-        ]
-    },
-    "seafoam-mist": {
-        label: "Seafoam mist",
-        stops: [
-            { t: 0, r: 230, g: 255, b: 248 },
-            { t: 0.2, r: 160, g: 240, b: 225 },
-            { t: 0.4, r: 70, g: 200, b: 195 },
-            { t: 0.6, r: 30, g: 150, b: 165 },
-            { t: 0.8, r: 15, g: 105, b: 130 },
-            { t: 1, r: 8, g: 62, b: 82 }
-        ]
-    },
     "cyan-magenta": {
         label: "Cyan to magenta (pink extreme)",
         stops: [
@@ -86,6 +64,17 @@ export const FLOOD_RASTER_RAMPS = {
         ]
     }
 };
+
+/**
+ * UI list order: teal → cyan–azure → navy, then divergent cyan–magenta (seafoam & slate removed as redundant).
+ */
+export const FLOOD_RAMP_IDS_ORDERED = [
+    "lagoon-teal",
+    "classic-cyan",
+    "tropical-azure",
+    "deep-navy",
+    "cyan-magenta"
+];
 
 export function getFloodRasterDisplayStops() {
     const ramp = FLOOD_RASTER_RAMPS[appState.currentFloodRasterRampId];

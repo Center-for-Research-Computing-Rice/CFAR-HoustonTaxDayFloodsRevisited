@@ -19,8 +19,12 @@ import {
     createDifferenceCentroidSimpleRenderer
 } from "./renderers/centroids.js";
 import { initHelpTooltips } from "./ui/helpTooltips.js";
+import { mountFloodRampPicker } from "./ui/floodRampPicker.js";
 
 export async function runApp() {
+    if (!FLOOD_RASTER_RAMPS[appState.currentFloodRasterRampId]) {
+        appState.currentFloodRasterRampId = "classic-cyan";
+    }
     const [clearCreekPack, huntingBayouPack] = await Promise.all([
         loadWatershedLayerPack(WATERSHED_DEFS["clear-creek"]),
         loadWatershedLayerPack(WATERSHED_DEFS["hunting-bayou"])
@@ -320,7 +324,11 @@ export async function runApp() {
     }
 
     const basemapDropdown = document.getElementById("basemap-dropdown");
-    const floodRampDropdown = document.getElementById("flood-ramp-dropdown");
+    const floodRampPickerRoot = document.getElementById("flood-ramp-picker-root");
+    const floodRampPicker = mountFloodRampPicker(floodRampPickerRoot, {
+        initialId: appState.currentFloodRasterRampId,
+        onChange: (id) => applyFloodRasterRamp(id)
+    });
     const scenarioButtons = document.querySelectorAll(".scenario-btn");
     const scenarioHint = document.getElementById("scenario-hint");
     const centroidsToggle = document.getElementById("centroids-toggle");
@@ -468,9 +476,6 @@ export async function runApp() {
             return;
         }
         appState.currentFloodRasterRampId = rampId;
-        if (floodRampDropdown) {
-            floodRampDropdown.value = rampId;
-        }
         refreshFloodRasterTiles();
         syncFloodLegendSwatches();
     }
@@ -479,12 +484,6 @@ export async function runApp() {
         map.basemap = createBasemap(event.target.value);
     });
 
-    if (floodRampDropdown) {
-        floodRampDropdown.addEventListener("change", (event) => {
-            applyFloodRasterRamp(event.target.value);
-        });
-        floodRampDropdown.value = appState.currentFloodRasterRampId;
-    }
     syncFloodLegendSwatches();
 
     scenarioButtons.forEach((btn) => {
@@ -656,9 +655,7 @@ export async function runApp() {
         if (depthFilterSlider) {
             depthFilterSlider.max = String(pack.depthFilterMaxFt);
         }
-        if (floodRampDropdown) {
-            floodRampDropdown.value = appState.currentFloodRasterRampId;
-        }
+        floodRampPicker.setValue(appState.currentFloodRasterRampId);
         if (opacitySlider) {
             opacitySlider.value = String(Number.isFinite(s.opacityTransparency) ? s.opacityTransparency : 30);
         }

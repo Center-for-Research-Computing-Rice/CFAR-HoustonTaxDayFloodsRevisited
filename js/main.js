@@ -12,18 +12,22 @@ import {
 } from "./homes/depthAndCount.js";
 import { ArcGISMap, FeatureFilter, MapView, reactiveUtils, Viewpoint } from "./esriImport.js";
 import { loadWatershedLayerPack } from "./layers/watershedPack.js";
-import { createBasemap } from "./map/basemap.js";
+import { BASEMAP_SELECTOR_OPTIONS, createBasemap } from "./map/basemap.js";
 import { refs } from "./refs.js";
 import {
     createCentroidRenderer,
     createDifferenceCentroidSimpleRenderer
 } from "./renderers/centroids.js";
 import { initHelpTooltips } from "./ui/helpTooltips.js";
+import { mountBasemapMapPicker } from "./ui/basemapMapPicker.js";
 import { mountFloodRampPicker } from "./ui/floodRampPicker.js";
 
 export async function runApp() {
     if (!FLOOD_RASTER_RAMPS[appState.currentFloodRasterRampId]) {
         appState.currentFloodRasterRampId = "classic-cyan";
+    }
+    if (!BASEMAP_SELECTOR_OPTIONS.some((o) => o.id === appState.currentBasemapId)) {
+        appState.currentBasemapId = "cartodb-positron";
     }
     const [clearCreekPack, huntingBayouPack] = await Promise.all([
         loadWatershedLayerPack(WATERSHED_DEFS["clear-creek"]),
@@ -44,7 +48,7 @@ export async function runApp() {
 
     const ccHome = WATERSHED_DEFS["clear-creek"].homeCenter;
     const map = new ArcGISMap({
-        basemap: createBasemap("cartodb-positron"),
+        basemap: createBasemap(appState.currentBasemapId),
         layers: [
             clearCreekPack.historic,
             clearCreekPack.transported,
@@ -323,7 +327,15 @@ export async function runApp() {
         console.error("Map components (Home / Zoom / Search) failed to initialize:", err);
     }
 
-    const basemapDropdown = document.getElementById("basemap-dropdown");
+    const basemapPickerRoot = document.getElementById("map-basemap-picker-root");
+    mountBasemapMapPicker(basemapPickerRoot, {
+        initialId: appState.currentBasemapId,
+        onSelect: (id) => {
+            appState.currentBasemapId = id;
+            map.basemap = createBasemap(id);
+        }
+    });
+
     const floodRampPickerRoot = document.getElementById("flood-ramp-picker-root");
     const floodRampPicker = mountFloodRampPicker(floodRampPickerRoot, {
         initialId: appState.currentFloodRasterRampId,
@@ -339,9 +351,6 @@ export async function runApp() {
     const opacityValue = document.getElementById("opacity-value");
     const depthFilterSlider = document.getElementById("depth-filter-slider");
     const depthFilterValue = document.getElementById("depth-filter-value");
-    const controlsToggle = document.getElementById("controls-toggle");
-    const controlsContent = document.getElementById("controls-content");
-
     function syncCentroidsLayerViewFilter() {
         if (!refs.centroidsLayerView) {
             return;
@@ -479,10 +488,6 @@ export async function runApp() {
         refreshFloodRasterTiles();
         syncFloodLegendSwatches();
     }
-
-    basemapDropdown.addEventListener("change", (event) => {
-        map.basemap = createBasemap(event.target.value);
-    });
 
     syncFloodLegendSwatches();
 
@@ -721,12 +726,6 @@ export async function runApp() {
         btn.addEventListener("click", () => {
             void switchWatershed(btn.dataset.watershed);
         });
-    });
-
-    controlsToggle.addEventListener("click", () => {
-        controlsContent.classList.toggle("collapsed");
-        const arrow = controlsToggle.textContent.includes("▲") ? "▼" : "▲";
-        controlsToggle.textContent = `Map options ${arrow}`;
     });
 
     initHelpTooltips();

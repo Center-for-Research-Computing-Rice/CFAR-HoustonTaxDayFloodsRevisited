@@ -3,5 +3,7 @@ export const appState = {
     currentFloodLayer: "historic",
     currentCentroidField: "TD_histori",
     currentWatershedId: "clear-creek",
-    currentFloodRasterRampId: "classic-cyan"
+    currentFloodRasterRampId: "classic-cyan",
+    /** Matches `BASEMAP_SELECTOR_OPTIONS` id; initial load uses CartoDB Positron. */
+    currentBasemapId: "cartodb-positron"
 };

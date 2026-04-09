@@ -206,25 +206,6 @@
                     </div>
                 </section>
 
-                <div id="controls-panel">
-                    <button id="controls-toggle" class="toggle-btn" type="button">Map options ▲</button>
-                    <div id="controls-content" class="collapsed">
-                        <div id="basemap-selector">
-                            <label for="basemap-dropdown">Basemap</label>
-                            <select id="basemap-dropdown">
-                                <option value="cartodb-positron">CartoDB Positron</option>
-                                <option value="esri-streets">Streets (Esri)</option>
-                                <option value="esri-satellite">Satellite (Esri)</option>
-                                <option value="esri-hybrid">Hybrid (Esri)</option>
-                                <option value="esri-topo">Topographic (Esri)</option>
-                                <option value="esri-light-gray">Light gray canvas (Esri)</option>
-                                <option value="esri-dark-gray">Dark gray canvas (Esri)</option>
-                                <option value="esri-terrain">Terrain (Esri)</option>
-                                <option value="esri-oceans">Oceans (Esri)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         <div class="map-view-wrap">
@@ -232,6 +213,7 @@
             <div class="map-embed-widgets map-embed-widgets--top-left" id="map-embed-widgets-tl">
                 <arcgis-home id="arcgis-home-widget"></arcgis-home>
                 <arcgis-zoom id="arcgis-zoom-widget"></arcgis-zoom>
+                <div id="map-basemap-picker-root"></div>
             </div>
             <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
         </div>

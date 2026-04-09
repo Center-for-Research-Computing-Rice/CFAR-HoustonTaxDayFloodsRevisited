@@ -38,7 +38,7 @@ export async function loadWatershedLayerPack(def) {
         tileInfo: historicTileInfo,
         floodDataMinFt: rangeH.minFt,
         floodDataMaxFt: rangeH.maxFt,
-        opacity: 0.7,
+        opacity: 1,
         visible: false
     });
     const transported = new DepthFilterFloodTileLayer({
@@ -52,7 +52,7 @@ export async function loadWatershedLayerPack(def) {
         tileInfo: transportedTileInfo,
         floodDataMinFt: rangeT.minFt,
         floodDataMaxFt: rangeT.maxFt,
-        opacity: 0.7,
+        opacity: 1,
         visible: false
     });
     const difference = new DifferenceFloodTileLayer({
@@ -67,7 +67,7 @@ export async function loadWatershedLayerPack(def) {
         floodHistoricMaxFt: rangeH.maxFt,
         floodTransportedMinFt: rangeT.minFt,
         floodTransportedMaxFt: rangeT.maxFt,
-        opacity: 0.7,
+        opacity: 1,
         visible: false
     });
     const centroids = new FeatureLayer({

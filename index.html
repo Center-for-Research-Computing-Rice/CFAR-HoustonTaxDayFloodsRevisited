@@ -86,7 +86,7 @@
                             >?</button>
                             <div id="tip-scenario" class="tip-bubble" role="tooltip">
                                 Pick <strong>Historic</strong>, <strong>Transported</strong> (Tax Day 2016 placed on this geography), or <strong>Difference</strong> (transported minus historic depth on the raster; homes that are dry in Historic but wet in Transported).
-                                Use <strong>Flood opacity</strong> to fade the raster. Affected home points follow the scenario (or the difference filter).
+                                Use <strong>Flood transparency</strong> to fade the raster. Affected home points follow the scenario (or the difference filter).
                             </div>
                         </span>
                     </div>
@@ -120,10 +120,10 @@
                         </button>
                     </div>
                     <div id="opacity-control">
-                        <label for="opacity-slider">Flood opacity</label>
+                        <label for="opacity-slider">Flood transparency</label>
                         <div id="opacity-container">
-                            <input type="range" id="opacity-slider" min="0" max="100" value="30" />
-                            <span id="opacity-value">70%</span>
+                            <input type="range" id="opacity-slider" min="0" max="100" value="0" />
+                            <span id="opacity-value">0%</span>
                         </div>
                     </div>
                     <div id="depth-filter-control">

@@ -581,7 +581,7 @@ export async function runApp() {
         refs.overlayLayers.transported.opacity = opacity;
         refs.overlayLayers.difference.opacity = opacity;
         if (opacityValue) {
-            opacityValue.textContent = `${100 - transparency}%`;
+            opacityValue.textContent = `${transparency}%`;
         }
     }
 
@@ -629,7 +629,7 @@ export async function runApp() {
     function defaultWatershedUiState() {
         return {
             scenario: "historic",
-            opacityTransparency: 30,
+            opacityTransparency: 0,
             depthFilterFt: 0,
             homesVisible: true
         };
@@ -643,7 +643,7 @@ export async function runApp() {
     function captureWatershedUiState(wsId) {
         watershedUiState[wsId] = {
             scenario: appState.currentFloodLayer,
-            opacityTransparency: Number.parseInt(opacitySlider?.value ?? "30", 10),
+            opacityTransparency: Number.parseInt(opacitySlider?.value ?? "0", 10),
             depthFilterFt: quantizeDepthFilterFt(depthFilterSlider?.value ?? 0),
             homesVisible: centroidsToggle?.getAttribute("aria-checked") === "true"
         };
@@ -657,7 +657,7 @@ export async function runApp() {
         }
         floodRampPicker.setValue(appState.currentFloodRasterRampId);
         if (opacitySlider) {
-            opacitySlider.value = String(Number.isFinite(s.opacityTransparency) ? s.opacityTransparency : 30);
+            opacitySlider.value = String(Number.isFinite(s.opacityTransparency) ? s.opacityTransparency : 0);
         }
         const maxD = pack.depthFilterMaxFt;
         const d = Math.min(quantizeDepthFilterFt(s.depthFilterFt), maxD);

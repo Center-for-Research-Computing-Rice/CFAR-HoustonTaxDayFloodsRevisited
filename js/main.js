@@ -704,7 +704,6 @@ export async function runApp() {
         updateWatershedPickerUi();
         syncAboutComparisonNarrative(newId);
         window.overlayLayers = refs.overlayLayers;
-        window.currentWatershedId = appState.currentWatershedId;
 
         const pack = refs.watershedLayerSets[newId];
         try {

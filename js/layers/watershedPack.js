@@ -16,10 +16,8 @@ export async function loadWatershedLayerPack(def) {
     ]);
     const rangeH = resolveFloodRasterDataRangeFt(legH, 0);
     const rangeT = resolveFloodRasterDataRangeFt(legT, 0);
-    const depthFilterMaxFt = Math.max(
-        1,
-        Math.ceil(Math.max(rangeH.maxFt, rangeT.maxFt, 1) * 10) / 10
-    );
+    /** UI slider max (ft); same for all watersheds — "Any depth" … 3 ft. */
+    const depthFilterMaxFt = 3;
     const hLod = effectiveMapServerLODRange(metaH);
     const tLod = effectiveMapServerLODRange(metaT);
     const historicTileInfo = clipTileInfoLods(metaH.tileInfo, hLod.min, hLod.max);

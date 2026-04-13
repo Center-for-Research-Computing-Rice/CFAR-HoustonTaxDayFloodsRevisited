@@ -129,11 +129,11 @@
                     <div id="depth-filter-control">
                         <label
                             for="depth-filter-slider"
-                            title="Minimum modeled depth (≥ threshold) kept on the flood raster and used for the flooded-home count (range depends on watershed, from layer legend). Raster colors use a ramp compressed so saturation is reached by ~2 ft modeled depth."
+                            title="Minimum modeled depth (≥ threshold) kept on the flood raster and used for the flooded-home count (0 = any depth, up to 3 ft). Raster colors use a ramp compressed so saturation is reached by ~2 ft modeled depth."
                             >Depth filter</label
                         >
                         <div id="depth-filter-container">
-                            <input type="range" id="depth-filter-slider" min="0" max="10" step="0.1" value="0" />
+                            <input type="range" id="depth-filter-slider" min="0" max="3" step="0.1" value="0" />
                             <span id="depth-filter-value">Any depth</span>
                         </div>
                     </div>

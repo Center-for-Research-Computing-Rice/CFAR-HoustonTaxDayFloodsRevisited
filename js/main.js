@@ -597,7 +597,7 @@ export async function runApp() {
     }
 
     function getActiveDepthFilterMaxFt() {
-        return refs.watershedLayerSets[appState.currentWatershedId]?.depthFilterMaxFt ?? 10;
+        return refs.watershedLayerSets[appState.currentWatershedId]?.depthFilterMaxFt ?? 3;
     }
 
     function applyFloodMinDepthFt(minFt) {

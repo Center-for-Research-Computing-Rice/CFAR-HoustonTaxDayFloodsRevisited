@@ -101,6 +101,44 @@ export function processBwFloodTileToBlue(imageData, minDepthFt, dataMinFt, dataM
     }
 }
 
+/**
+ * BW tiles → neutral greyscale by depth (R=G=B), same depth cutoff as {@link processBwFloodTileToBlue}.
+ * Used as a faint underlay in Difference mode (layer opacity ~50%).
+ */
+export function processBwFloodTileToGreyscale(imageData, minDepthFt, dataMinFt, dataMaxFt) {
+    const data = imageData.data;
+    const len = data.length;
+    const minD = Math.max(0, Number(minDepthFt) || 0);
+    const dMin = Number(dataMinFt);
+    const dMax = Number(dataMaxFt);
+    const rangeMin = Number.isFinite(dMin) ? dMin : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.minFt;
+    const rangeMax = Number.isFinite(dMax) ? dMax : FLOOD_RASTER_DATA_RANGE_FALLBACK_FT.maxFt;
+    const dataSpan = Math.max(1e-6, rangeMax - rangeMin);
+
+    for (let i = 0; i < len; i += 4) {
+        if (data[i + 3] < 8) {
+            continue;
+        }
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const lum = (r + g + b) / 3;
+        const depthNorm = (255 - lum) / 255;
+        const depthDataFt = rangeMin + depthNorm * dataSpan;
+
+        if (!depthPassesMinFilterFt(depthDataFt, minD)) {
+            data[i + 3] = 0;
+            continue;
+        }
+
+        const u = Math.max(0, Math.min(1, (depthDataFt - rangeMin) / dataSpan));
+        const grey = Math.round(228 - u * 148);
+        data[i] = grey;
+        data[i + 1] = grey;
+        data[i + 2] = grey;
+    }
+}
+
 export function depthFromBwSample(data, i, rangeMin, rangeMax) {
     const span = Math.max(1e-6, rangeMax - rangeMin);
     if (data[i + 3] < 8) {

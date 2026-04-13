@@ -43,6 +43,7 @@ export async function runApp() {
     refs.overlayLayers = {
         historic: clearCreekPack.historic,
         transported: clearCreekPack.transported,
+        transportedDiffGrey: clearCreekPack.transportedDiffGrey,
         difference: clearCreekPack.difference,
         centroids: clearCreekPack.centroids
     };
@@ -53,10 +54,12 @@ export async function runApp() {
         layers: [
             clearCreekPack.historic,
             clearCreekPack.transported,
+            clearCreekPack.transportedDiffGrey,
             clearCreekPack.difference,
             clearCreekPack.centroids,
             huntingBayouPack.historic,
             huntingBayouPack.transported,
+            huntingBayouPack.transportedDiffGrey,
             huntingBayouPack.difference,
             huntingBayouPack.centroids
         ]
@@ -421,7 +424,7 @@ export async function runApp() {
             } else {
                 scenarioHint.textContent = "Showing: Difference (transported − historic).";
                 scenarioHint.title =
-                    "Raster shows depth gained (transported minus historic) where that gain is positive. Affected homes count uses the same depth gain (transported − historic), with the depth filter applied to that gain.";
+                    "Top color layer: depth gain (transported − historic). Faint grey underneath: transported flood (greyscale), same depth filter. Affected homes = transported count minus historic count at the threshold.";
             }
         }
     }
@@ -434,6 +437,9 @@ export async function runApp() {
             if (!active) {
                 pack.historic.visible = false;
                 pack.transported.visible = false;
+                if (pack.transportedDiffGrey) {
+                    pack.transportedDiffGrey.visible = false;
+                }
                 if (pack.difference) {
                     pack.difference.visible = false;
                 }
@@ -441,6 +447,9 @@ export async function runApp() {
             } else {
                 pack.historic.visible = appState.currentFloodLayer === "historic";
                 pack.transported.visible = appState.currentFloodLayer === "transported";
+                if (pack.transportedDiffGrey) {
+                    pack.transportedDiffGrey.visible = appState.currentFloodLayer === "difference";
+                }
                 if (pack.difference) {
                     pack.difference.visible = appState.currentFloodLayer === "difference";
                 }
@@ -489,6 +498,7 @@ export async function runApp() {
             const pack = refs.watershedLayerSets[id];
             pack.historic.refresh?.();
             pack.transported.refresh?.();
+            pack.transportedDiffGrey?.refresh?.();
             pack.difference?.refresh?.();
         }
     }
@@ -587,7 +597,13 @@ export async function runApp() {
     queueMicrotask(() => flashAboutComparisonSummaryOutline());
 
     function applyFloodOpacityFromSlider() {
-        if (!opacitySlider || !refs.overlayLayers?.historic || !refs.overlayLayers?.transported || !refs.overlayLayers?.difference) {
+        if (
+            !opacitySlider ||
+            !refs.overlayLayers?.historic ||
+            !refs.overlayLayers?.transported ||
+            !refs.overlayLayers?.transportedDiffGrey ||
+            !refs.overlayLayers?.difference
+        ) {
             return;
         }
         const transparency = Number.parseInt(opacitySlider.value, 10);
@@ -598,6 +614,7 @@ export async function runApp() {
         refs.overlayLayers.historic.opacity = opacity;
         refs.overlayLayers.transported.opacity = opacity;
         refs.overlayLayers.difference.opacity = opacity;
+        refs.overlayLayers.transportedDiffGrey.opacity = opacity * 0.5;
         if (opacityValue) {
             opacityValue.textContent = `${transparency}%`;
         }
@@ -618,6 +635,7 @@ export async function runApp() {
         const v = Math.min(quantizeDepthFilterFt(minFt), maxFt);
         refs.overlayLayers.historic.minDepthFt = v;
         refs.overlayLayers.transported.minDepthFt = v;
+        refs.overlayLayers.transportedDiffGrey.minDepthFt = v;
         refs.overlayLayers.difference.minDepthFt = v;
         if (depthFilterSlider) {
             depthFilterSlider.value = String(v);
@@ -631,6 +649,7 @@ export async function runApp() {
             refs.overlayLayers.transported.refresh();
         } else {
             refs.overlayLayers.difference?.refresh?.();
+            refs.overlayLayers.transportedDiffGrey?.refresh?.();
         }
     }
 
@@ -713,6 +732,7 @@ export async function runApp() {
         refs.overlayLayers = {
             historic: refs.watershedLayerSets[newId].historic,
             transported: refs.watershedLayerSets[newId].transported,
+            transportedDiffGrey: refs.watershedLayerSets[newId].transportedDiffGrey,
             difference: refs.watershedLayerSets[newId].difference,
             centroids: refs.watershedLayerSets[newId].centroids
         };

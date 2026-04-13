@@ -11,7 +11,8 @@ import {
     compositeBwDifferenceTile,
     depthPassesMinFilterFt,
     estimatedDepthFromLegendSamples,
-    processBwFloodTileToBlue
+    processBwFloodTileToBlue,
+    processBwFloodTileToGreyscale
 } from "../flood/tilePixels.js";
 
 export class DepthFilterFloodTileLayer extends BaseTileLayer {
@@ -21,6 +22,8 @@ export class DepthFilterFloodTileLayer extends BaseTileLayer {
         floodScenarioId,
         legendDepthSamples,
         tileRgbMode = "legendDepth",
+        /** When set (e.g. `"difference"`), tiles render only in that scenario instead of matching `floodScenarioId`. */
+        activateForScenario = null,
         spatialReference,
         fullExtent,
         tileInfo,
@@ -38,6 +41,7 @@ export class DepthFilterFloodTileLayer extends BaseTileLayer {
         this.tileServiceRoot = tileServiceRoot.replace(/\/$/, "");
         this.minDepthFt = minDepthFt ?? 0;
         this.floodScenarioId = floodScenarioId;
+        this.activateForScenario = activateForScenario;
         this._legendDepthSamples = legendDepthSamples ?? [];
         this._tileRgbMode = tileRgbMode;
         this._coverageEnvelope = envelopeFromLayerExtent(fullExtent);
@@ -57,8 +61,15 @@ export class DepthFilterFloodTileLayer extends BaseTileLayer {
         return `${this.tileServiceRoot}/tile/${level}/${row}/${col}`;
     }
 
+    _isActiveForCurrentScenario() {
+        if (this.activateForScenario != null) {
+            return appState.currentFloodLayer === this.activateForScenario;
+        }
+        return this.floodScenarioId === appState.currentFloodLayer;
+    }
+
     fetchTile(level, row, col, options) {
-        if (this.floodScenarioId !== appState.currentFloodLayer || this.visible === false) {
+        if (!this._isActiveForCurrentScenario() || this.visible === false) {
             return Promise.resolve(this.getEmptyTileCanvas());
         }
 
@@ -105,6 +116,10 @@ export class DepthFilterFloodTileLayer extends BaseTileLayer {
                 if (this._tileRgbMode === "bwBlue") {
                     const imageData = ctx.getImageData(0, 0, w, h);
                     processBwFloodTileToBlue(imageData, minDepth, this.floodDataMinFt, this.floodDataMaxFt);
+                    ctx.putImageData(imageData, 0, 0);
+                } else if (this._tileRgbMode === "bwGrey") {
+                    const imageData = ctx.getImageData(0, 0, w, h);
+                    processBwFloodTileToGreyscale(imageData, minDepth, this.floodDataMinFt, this.floodDataMaxFt);
                     ctx.putImageData(imageData, 0, 0);
                 } else if (minDepth > 0 && legend.length > 0) {
                     const imageData = ctx.getImageData(0, 0, w, h);

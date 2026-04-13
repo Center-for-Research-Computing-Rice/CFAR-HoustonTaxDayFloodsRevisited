@@ -53,6 +53,22 @@ export async function loadWatershedLayerPack(def) {
         opacity: 1,
         visible: false
     });
+    /** Difference mode only: faint greyscale transported, same depth filter (opacity set in main). */
+    const transportedDiffGrey = new DepthFilterFloodTileLayer({
+        tileServiceRoot: tUrl,
+        floodScenarioId: "transported",
+        activateForScenario: "difference",
+        minDepthFt: 0,
+        legendDepthSamples: [],
+        tileRgbMode: "bwGrey",
+        spatialReference: metaT.spatialReference,
+        fullExtent: metaT.fullExtent,
+        tileInfo: transportedTileInfo,
+        floodDataMinFt: rangeT.minFt,
+        floodDataMaxFt: rangeT.maxFt,
+        opacity: 0.5,
+        visible: false
+    });
     const difference = new DifferenceFloodTileLayer({
         historicTileRoot: hUrl,
         transportedTileRoot: tUrl,
@@ -111,6 +127,7 @@ export async function loadWatershedLayerPack(def) {
         def,
         historic,
         transported,
+        transportedDiffGrey,
         difference,
         centroids,
         depthFilterMaxFt,

@@ -408,7 +408,7 @@ export async function runApp() {
             } else {
                 scenarioHint.textContent = "Showing: Difference (transported − historic).";
                 scenarioHint.title =
-                    "Raster shows depth gained (transported minus historic) where that gain is positive. Homes: dry in Historic but flooded in Transported. Depth filter applies to transported depth and to positive gain on the raster.";
+                    "Raster shows depth gained (transported minus historic) where that gain is positive. Homes: dry in Historic with positive gain; the depth filter applies to that gain (same as the raster), not to transported depth alone.";
             }
         }
     }

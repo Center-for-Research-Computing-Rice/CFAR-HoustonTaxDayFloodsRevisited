@@ -85,7 +85,7 @@
                                 aria-controls="tip-scenario"
                             >?</button>
                             <div id="tip-scenario" class="tip-bubble" role="tooltip">
-                                Pick <strong>Historic</strong>, <strong>Transported</strong> (Tax Day 2016 placed on this geography), or <strong>Difference</strong> (transported minus historic depth on the raster; homes that are dry in Historic but wet in Transported).
+                                Pick <strong>Historic</strong>, <strong>Transported</strong> (Tax Day 2016 placed on this geography), or <strong>Difference</strong> (transported minus historic depth on the raster and in the affected-homes count).
                                 Use <strong>Flood transparency</strong> to fade the raster. Affected home points follow the scenario (or the difference filter).
                             </div>
                         </span>
@@ -114,7 +114,7 @@
                             class="scenario-btn"
                             data-scenario="difference"
                             aria-pressed="false"
-                            title="Raster: transported depth minus historic where gain is positive. Homes: not flooded in Historic but flooded in Transported."
+                            title="Raster: transported depth minus historic where gain is positive. Affected homes: same depth gain vs. the depth filter."
                         >
                             <span class="scenario-btn-title">Difference</span>
                         </button>

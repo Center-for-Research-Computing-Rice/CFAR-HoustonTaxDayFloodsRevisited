@@ -44,4 +44,4 @@ export const WATERSHED_DEFS = {
 
 /** Same for every watershed; shown in About → narrative list. */
 export const ABOUT_COMPARISON_DIFFERENCE_HTML =
-    '<span class="narrative-term">Difference</span> — The flood layer shows <strong>transported minus historic</strong> depth (feet) wherever that gain is positive—where placing the Tax Day 2016 storm on this watershed would add water beyond what the actual 2016 event produced. <strong>Affected homes</strong> are filtered to show only those that are not flooded in Historic but flooded in Transported.';
+    '<span class="narrative-term">Difference</span> — The flood layer shows <strong>transported minus historic</strong> depth (feet) wherever that gain is positive—where placing the Tax Day 2016 storm on this watershed would add water beyond what the actual 2016 event produced. <strong>Affected homes</strong> is the net count: homes at or above the depth threshold in <strong>Transported</strong> minus homes at or above the same threshold in <strong>Historic</strong>.';

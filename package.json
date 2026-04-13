@@ -1,7 +1,0 @@
-{
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "test": "node --test js/homes/depthWhereClause.test.mjs"
-    }
-}

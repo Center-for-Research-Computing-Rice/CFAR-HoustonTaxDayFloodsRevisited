@@ -4,6 +4,7 @@ import { FLOOD_RASTER_RAMPS, getFloodColor } from "./flood/colorRamp.js";
 import { syncFloodLegendForScenario, syncFloodLegendSwatches } from "./flood/legendUi.js";
 import {
     buildCentroidDepthWhereClause,
+    buildSingleScenarioDepthWhereClause,
     formatDepthFilterReadout,
     getFloodMinDepthFt,
     quantizeDepthFilterFt,
@@ -378,8 +379,20 @@ export async function runApp() {
 
         try {
             await refs.overlayLayers.centroids.load();
-            const count = await refs.overlayLayers.centroids.queryFeatureCount({ where });
-            homesFloodedCountEl.textContent = count.toLocaleString();
+            const layer = refs.overlayLayers.centroids;
+            if (appState.currentFloodLayer === "difference") {
+                const wdef = WATERSHED_DEFS[appState.currentWatershedId];
+                const whereT = buildSingleScenarioDepthWhereClause(wdef.transportedField);
+                const whereH = buildSingleScenarioDepthWhereClause(wdef.historicField);
+                const [countT, countH] = await Promise.all([
+                    layer.queryFeatureCount({ where: whereT }),
+                    layer.queryFeatureCount({ where: whereH })
+                ]);
+                homesFloodedCountEl.textContent = (countT - countH).toLocaleString();
+            } else {
+                const count = await layer.queryFeatureCount({ where });
+                homesFloodedCountEl.textContent = count.toLocaleString();
+            }
         } catch {
             homesFloodedCountEl.textContent = "—";
         } finally {
@@ -408,7 +421,7 @@ export async function runApp() {
             } else {
                 scenarioHint.textContent = "Showing: Difference (transported − historic).";
                 scenarioHint.title =
-                    "Raster shows depth gained (transported minus historic) where that gain is positive. Homes: dry in Historic with positive gain; the depth filter applies to that gain (same as the raster), not to transported depth alone.";
+                    "Raster shows depth gained (transported minus historic) where that gain is positive. Affected homes count uses the same depth gain (transported − historic), with the depth filter applied to that gain.";
             }
         }
     }

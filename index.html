@@ -20,7 +20,9 @@
     <!-- Maps SDK 5 CDN (ESM entry loads core + map components + Calcite). https://developers.arcgis.com/javascript/latest/get-started/ -->
     <script type="module" src="https://js.arcgis.com/5.0/"></script>
     <link rel="stylesheet" href="https://js.arcgis.com/5.0/esri/themes/light/main.css" />
-    
+    <!-- Linked here (not only via JS import) so layout styles load with the document and avoid FOUC -->
+    <link rel="stylesheet" href="/src/styles.css" />
+
 </head>
 <body>
     <div id="map-container">
@@ -221,12 +223,12 @@
         </div>
         <div class="map-view-wrap">
             <div id="viewDiv"></div>
+            <p class="map-mobile-title-watermark" aria-hidden="true">Houston Tax Day Flood Revisited</p>
             <div class="map-embed-widgets map-embed-widgets--top-left" id="map-embed-widgets-tl">
                 <arcgis-home id="arcgis-home-widget"></arcgis-home>
                 <arcgis-zoom id="arcgis-zoom-widget"></arcgis-zoom>
                 <div id="map-basemap-picker-root"></div>
             </div>
-            <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
             <div class="flood-legend-stack" id="flood-legend-stack">
                 <button
                     type="button"
@@ -234,8 +236,11 @@
                     id="flood-legend-toggle"
                     aria-expanded="false"
                     aria-controls="flood-legend"
+                    aria-haspopup="dialog"
+                    title="Legend"
+                    aria-label="Legend"
                 >
-                    Legend
+                    <span class="esri-icon esri-icon-legend" aria-hidden="true"></span>
                 </button>
                 <div id="flood-legend">
             <div class="flood-legend-header">
@@ -327,6 +332,7 @@
             <div id="flood-ramp-picker-root" class="flood-ramp-picker-root"></div>
                 </div>
             </div>
+            <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
         </div>
         <div
             class="mobile-sheet-backdrop"

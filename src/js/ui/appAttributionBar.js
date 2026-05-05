@@ -100,14 +100,68 @@ function getViewContainer(view) {
     return c;
 }
 
+let legendClearanceResizeObserver = null;
+let legendClearanceObservedBar = null;
+
+/**
+ * Keeps the desktop flood-legend stack above the Esri attribution strip (height changes with text wrap).
+ * @param {HTMLElement} viewRoot
+ * @param {HTMLElement | null} mapWrap
+ */
+function updateLegendAttributionClearance(viewRoot, mapWrap) {
+    if (!mapWrap) return;
+
+    /** Space between attribution top and legend bottom (keep small; full bar height is measured separately). */
+    const gapPx = 8;
+    /** When the bar is not in the DOM yet — user asked for ~25px total reserve, not a large floor on measured height. */
+    const fallbackClearancePx = 25;
+
+    const setClearance = (px) => {
+        mapWrap.style.setProperty("--map-attribution-clearance", `${Math.max(0, Math.round(px))}px`);
+    };
+
+    const bar = findAttributionBar(viewRoot);
+    if (!bar) {
+        setClearance(fallbackClearancePx);
+        if (legendClearanceResizeObserver) {
+            legendClearanceResizeObserver.disconnect();
+            legendClearanceResizeObserver = null;
+            legendClearanceObservedBar = null;
+        }
+        return;
+    }
+
+    const measure = () => {
+        const raw = bar.getBoundingClientRect().height || bar.offsetHeight;
+        const h = raw > 0 ? raw : fallbackClearancePx;
+        setClearance(h + gapPx);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    if (bar !== legendClearanceObservedBar) {
+        if (legendClearanceResizeObserver) {
+            legendClearanceResizeObserver.disconnect();
+        }
+        legendClearanceObservedBar = bar;
+        legendClearanceResizeObserver = new ResizeObserver(measure);
+        legendClearanceResizeObserver.observe(bar);
+    }
+}
+
 /** @param {{ container: string | HTMLElement }} view */
 export function mountAppAttributionInMapBar(view) {
     const container = getViewContainer(view);
     if (!container) return;
 
+    const mapWrap = container.closest(".map-view-wrap");
+
     const ensure = () => {
         const bar = findAttributionBar(container);
         if (bar) insertIntoBar(bar);
+        updateLegendAttributionClearance(container, mapWrap);
     };
 
     ensure();

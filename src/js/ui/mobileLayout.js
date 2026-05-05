@@ -11,9 +11,24 @@ export function initMobileLayout(options = {}) {
     const backdrop = document.getElementById("mobile-sheet-backdrop");
     const legendStack = document.getElementById("flood-legend-stack");
     const legendToggle = document.getElementById("flood-legend-toggle");
+    const mapEmbed = document.getElementById("map-embed-widgets-tl");
+    const mapWrap = document.querySelector(".map-view-wrap");
+    const homesHover = document.getElementById("homes-hover-popup");
     const mq = window.matchMedia(MOBILE_MQ);
 
     const isMobile = () => mq.matches;
+
+    /** Mobile: legend control sits under basemap in the embed column. Desktop: bottom-left of map (sibling before homes hover). */
+    function placeFloodLegendStack() {
+        if (!legendStack || !mapEmbed || !mapWrap) return;
+        if (isMobile()) {
+            mapEmbed.appendChild(legendStack);
+        } else if (homesHover && homesHover.parentNode === mapWrap) {
+            mapWrap.insertBefore(legendStack, homesHover);
+        } else {
+            mapWrap.appendChild(legendStack);
+        }
+    }
 
     function notifyLayout() {
         requestAnimationFrame(() => {
@@ -50,18 +65,34 @@ export function initMobileLayout(options = {}) {
         window.setTimeout(notifyLayout, 320);
     });
 
-    legendToggle?.addEventListener("click", () => {
-        if (!legendStack || !isMobile()) return;
+    legendToggle?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!isMobile() || !legendStack) return;
         const open = legendStack.classList.toggle("flood-legend-stack--open");
         legendToggle.setAttribute("aria-expanded", String(open));
+        notifyLayout();
+        window.setTimeout(notifyLayout, 120);
     });
+
+    document.addEventListener(
+        "pointerdown",
+        (e) => {
+            if (!isMobile() || !legendStack?.classList.contains("flood-legend-stack--open")) return;
+            if (legendStack.contains(e.target)) return;
+            legendStack.classList.remove("flood-legend-stack--open");
+            legendToggle?.setAttribute("aria-expanded", "false");
+            notifyLayout();
+        },
+        true
+    );
 
     document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
         closeSidebar();
-        if (legendStack?.classList.contains("flood-legend-stack--open")) {
+        if (isMobile() && legendStack?.classList.contains("flood-legend-stack--open")) {
             legendStack.classList.remove("flood-legend-stack--open");
             legendToggle?.setAttribute("aria-expanded", "false");
+            notifyLayout();
         }
     });
 
@@ -74,10 +105,12 @@ export function initMobileLayout(options = {}) {
             legendToggle?.setAttribute("aria-expanded", "false");
             hideBackdrop();
         }
+        placeFloodLegendStack();
         notifyLayout();
     });
 
-    const mapWrap = document.querySelector(".map-view-wrap");
+    placeFloodLegendStack();
+
     if (mapWrap && typeof ResizeObserver !== "undefined") {
         const ro = new ResizeObserver(() => notifyLayout());
         ro.observe(mapWrap);

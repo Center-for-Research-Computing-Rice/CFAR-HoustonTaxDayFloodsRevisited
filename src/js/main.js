@@ -19,6 +19,7 @@ import {
     createCentroidRenderer,
     createDifferenceCentroidSimpleRenderer
 } from "./renderers/centroids.js";
+import { mountAppAttributionInMapBar } from "./ui/appAttributionBar.js";
 import { initHelpTooltips } from "./ui/helpTooltips.js";
 import { mountBasemapMapPicker } from "./ui/basemapMapPicker.js";
 import { mountFloodRampPicker } from "./ui/floodRampPicker.js";
@@ -79,6 +80,7 @@ export async function runApp() {
     refs.view = view;
 
     await view.when();
+    mountAppAttributionInMapBar(view);
 
     function rebindCentroidsLayerView() {
         refs.centroidsLayerView = null;

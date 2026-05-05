@@ -58,6 +58,16 @@ html, body, #viewDiv {
     height: 100%;
 }
 
+/* Injected into MapView attribution bar (see ui/appAttributionBar.js) */
+.map-app-attribution-inline a {
+    color: #0079c1;
+    text-decoration: underline;
+}
+
+.map-app-attribution-inline a:hover {
+    color: #005a8c;
+}
+
 .map-embed-widgets--top-left {
     position: absolute;
     top: 12px;

@@ -21,6 +21,7 @@ import {
 } from "./renderers/centroids.js";
 import { mountAppAttributionInMapBar } from "./ui/appAttributionBar.js";
 import { initHelpTooltips } from "./ui/helpTooltips.js";
+import { initMobileLayout } from "./ui/mobileLayout.js";
 import { mountBasemapMapPicker } from "./ui/basemapMapPicker.js";
 import { mountFloodRampPicker } from "./ui/floodRampPicker.js";
 
@@ -763,6 +764,14 @@ export async function runApp() {
         });
     });
 
+    initMobileLayout({
+        onLayoutChange() {
+            const v = refs.view;
+            if (v && typeof v.resize === "function") {
+                v.resize();
+            }
+        }
+    });
     initHelpTooltips();
 
     window.arcgisMap = map;

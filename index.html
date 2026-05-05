@@ -25,6 +25,18 @@
 <body>
     <div id="map-container">
         <div id="sidebar">
+            <button
+                type="button"
+                class="sidebar-sheet-handle"
+                id="sidebar-sheet-handle"
+                aria-expanded="false"
+                aria-label="Open map controls panel"
+            >
+                <span class="sidebar-sheet-handle__pill" aria-hidden="true"></span>
+                <span class="sidebar-sheet-handle__label">Map controls</span>
+                <span class="sidebar-sheet-handle__chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-sheet-content">
             <div id="sidebar-header">
                 <div class="sidebar-title-block">
                     <h1>Houston Tax Day Flood Revisited</h1>
@@ -205,6 +217,7 @@
                 </section>
 
             </div>
+            </div>
         </div>
         <div class="map-view-wrap">
             <div id="viewDiv"></div>
@@ -214,8 +227,17 @@
                 <div id="map-basemap-picker-root"></div>
             </div>
             <div id="homes-hover-popup" class="homes-hover-popup" hidden aria-hidden="true"></div>
-        </div>
-        <div id="flood-legend">
+            <div class="flood-legend-stack" id="flood-legend-stack">
+                <button
+                    type="button"
+                    class="flood-legend-toggle"
+                    id="flood-legend-toggle"
+                    aria-expanded="false"
+                    aria-controls="flood-legend"
+                >
+                    Legend
+                </button>
+                <div id="flood-legend">
             <div class="flood-legend-header">
                 <h3 id="flood-legend-heading">Flood depth</h3>
                 <span class="tip-wrap tip-wrap--click-only tip-wrap--wide tip-wrap--map-bounded">
@@ -265,6 +287,7 @@
                     </div>
                 </span>
             </div>
+            <div class="flood-legend__items">
             <div class="legend-item" data-depth-class="none">
                 <span class="legend-color" style="background-color: #ffffff;"></span>
                 <div class="legend-text">
@@ -300,8 +323,17 @@
                     <span class="legend-depth">2+ ft</span>
                 </div>
             </div>
+            </div>
             <div id="flood-ramp-picker-root" class="flood-ramp-picker-root"></div>
+                </div>
+            </div>
         </div>
+        <div
+            class="mobile-sheet-backdrop"
+            id="mobile-sheet-backdrop"
+            hidden
+            aria-hidden="true"
+        ></div>
     </div>
 
     <script type="module" src="/src/main.js"></script>

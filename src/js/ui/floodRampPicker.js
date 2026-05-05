@@ -90,14 +90,58 @@ export function mountFloodRampPicker(containerEl, { initialId, onChange }) {
         menu.appendChild(opt);
     });
 
+    function syncMenuToViewport() {
+        if (menu.hidden) {
+            return;
+        }
+        const margin = 10;
+        menu.classList.remove("flood-ramp-picker__menu--flip-x", "flood-ramp-picker__menu--flip-y");
+        menu.style.maxWidth = "";
+        menu.style.maxHeight = "";
+
+        const apply = () => {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            let r = menu.getBoundingClientRect();
+
+            if (r.right > vw - margin) {
+                menu.classList.add("flood-ramp-picker__menu--flip-x");
+            }
+            r = menu.getBoundingClientRect();
+            if (r.left < margin) {
+                menu.style.maxWidth = `${Math.max(100, vw - margin * 2)}px`;
+            }
+
+            r = menu.getBoundingClientRect();
+            if (r.top < margin) {
+                menu.classList.add("flood-ramp-picker__menu--flip-y");
+            }
+            r = menu.getBoundingClientRect();
+            if (r.bottom > vh - margin) {
+                const h = Math.max(100, vh - margin - Math.max(margin, r.top));
+                menu.style.maxHeight = `${h}px`;
+            }
+        };
+
+        requestAnimationFrame(() => {
+            apply();
+            void menu.offsetHeight;
+            apply();
+        });
+    }
+
     function openMenu() {
         menu.hidden = false;
         trigger.setAttribute("aria-expanded", "true");
+        syncMenuToViewport();
     }
 
     function closeMenu() {
         menu.hidden = true;
         trigger.setAttribute("aria-expanded", "false");
+        menu.classList.remove("flood-ramp-picker__menu--flip-x", "flood-ramp-picker__menu--flip-y");
+        menu.style.maxWidth = "";
+        menu.style.maxHeight = "";
     }
 
     trigger.addEventListener("click", (e) => {
@@ -123,8 +167,11 @@ export function mountFloodRampPicker(containerEl, { initialId, onChange }) {
         }
     };
 
+    const onWinResize = () => syncMenuToViewport();
+
     document.addEventListener("pointerdown", onDocPointerDown, true);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onWinResize);
 
     wrap.appendChild(trigger);
     wrap.appendChild(menu);
@@ -146,6 +193,7 @@ export function mountFloodRampPicker(containerEl, { initialId, onChange }) {
         destroy() {
             document.removeEventListener("pointerdown", onDocPointerDown, true);
             document.removeEventListener("keydown", onKey);
+            window.removeEventListener("resize", onWinResize);
             wrap.remove();
         }
     };
